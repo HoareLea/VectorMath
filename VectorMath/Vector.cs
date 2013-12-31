@@ -491,8 +491,10 @@ namespace VectorMath
                     if (numcrmag == 0 && dencrmag == 0)
                     {
                         //the two lines are clearly parallel
+                        
                         //not sure if this check is needed, but we ensure that these two parallel lines are unique and do not overlap
                         //it gets a bit more complicated from here
+                        
                         double p12x = P1.X + L1.X;
                         double p12y = P1.Y + L1.Y;
                         double p12z = P1.Z + L1.Z;
@@ -502,7 +504,63 @@ namespace VectorMath
                         double p22y = P2.Y + L2.Y;
                         double p22z = P2.Z + L2.Z;
                         MemorySafe_CartCoord P22 = new Vector.MemorySafe_CartCoord(p22x, p22y, p22z);
+                        double diffx = P12.X - P1.X;
+                        double diffy = P12.Y - P1.Y;
+                        double p1xmin = Math.Min(P1.X, P12.X);
+                        double p1xmax = Math.Max(P1.X, P12.X);
+                        double p1ymin = Math.Min(P1.Y, P12.Y);
+                        double p1ymax = Math.Max(P1.Y, P12.Y);
+                        if (diffy == 0)
+                        {
+                            //at this point all we need to do is check to see if X or Y of one vector fall into the range of the other
+                            if ((P2.X >= p1xmin && P2.X <= p1xmax) || (P22.X >= p1xmin && P22.X <= p1xmax))
+                            {
+                                log.Info("FAIL:  Lines intersect illegally.");
+                                return false;
+                            }
+                            else
+                            {
+                                IntTruth.Add(true);
+                                continue;
+                            }
+                        }
+                        else if (diffx == 0)
+                        {
+                            //at this point all we need to do is check to see if X or Y of one vector fall into the range of the other
+                            if ((P2.Y >= p1ymin && P2.Y <= p1ymax) || (P22.Y >= p1ymin && P22.Y <= p1ymax))
+                            {
+                                log.Info("FAIL:  Lines intersect illegally.");
+                                return false;
+                            }
+                            else
+                            {
+                                IntTruth.Add(true);
+                                continue;
+                            }
+                        }
+                        else
+                        {
+                            //I just need to see if the two lines intersect somewhere using common cartesian math
+                            double slope1 = diffy / diffx;
+                            double slope2 = (P22.Y - P2.Y) / (P22.X - P2.X);
+                            double b1 = slope1 * P1.X - P1.Y;
+                            double b2 = slope2 * P2.X - P2.Y;
 
+                            double xint = (b2 - b1) / (slope1 - slope2);
+                            double yint = slope1 * P1.X + b1;
+
+                            if ((xint >= p1xmin && xint <= p1xmax) || (yint >= p1ymin && yint <= p1ymax))
+                            {
+                                log.Info("FAIL:  Lines intersect illegally.");
+                                return false;
+                            }
+                            else
+                            {
+                                IntTruth.Add(true);
+                                continue;
+                            }
+
+                        }
                     }
                     double a = numcrmag / dencrmag;
 
@@ -555,6 +613,7 @@ namespace VectorMath
                         }
                         else if (j != 0 && a == 0)
                         {
+                            //this needs to be updated, to be similar to a<1.0
                             log.Error("The vector " + (j + k).ToString() + " intersects vector " + j.ToString() + " at its starting point.");
                             log.Debug(j.ToString() + ":" + (j+k).ToString() + ";" + "NNN" + ";" + "FAIL");
                             return false;
