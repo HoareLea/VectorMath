@@ -493,6 +493,15 @@ namespace VectorMath
                         //the two lines are clearly parallel
                         //not sure if this check is needed, but we ensure that these two parallel lines are unique and do not overlap
                         //it gets a bit more complicated from here
+                        double p12x = P1.X + L1.X;
+                        double p12y = P1.Y + L1.Y;
+                        double p12z = P1.Z + L1.Z;
+                        MemorySafe_CartCoord P12 = new Vector.MemorySafe_CartCoord(p12x,p12y,p12z);
+
+                        double p22x = P2.X + L2.X;
+                        double p22y = P2.Y + L2.Y;
+                        double p22z = P2.Z + L2.Z;
+                        MemorySafe_CartCoord P22 = new Vector.MemorySafe_CartCoord(p22x, p22y, p22z);
 
                     }
                     double a = numcrmag / dencrmag;
