@@ -39,6 +39,22 @@ namespace VectorMath
             public double Z { get { return _Z; } }
         }
 
+        public class MemorySafe_LongCoord
+        {
+            private readonly long _X, _Y, _Z;
+
+            public MemorySafe_LongCoord(long X, long Y, long Z)
+            {
+                _X = X;
+                _Y = Y;
+                _Z = Z;
+            }
+
+            public long X { get { return _X; } }
+            public long Y { get { return _Y; } }
+            public long Z { get { return _Z; } }
+        }
+
         public class CartVect
         {
             public CartVect()
@@ -400,12 +416,12 @@ namespace VectorMath
             List<List<MemorySafe_CartCoord>> retlist = new List<List<MemorySafe_CartCoord>>();
             //list of all the coordinates that intersect
             List<MemorySafe_CartCoord> intlist = new List<MemorySafe_CartCoord>();
-            Dictionary<Vector.MemorySafe_CartCoord, Vector.MemorySafe_CartVect> origpointvec = new Dictionary<MemorySafe_CartCoord, Vector.MemorySafe_CartVect>();
-            Dictionary<Vector.MemorySafe_CartCoord, Vector.MemorySafe_CartVect> centpointvec = new Dictionary<MemorySafe_CartCoord, Vector.MemorySafe_CartVect>();
+            List<Vector.MemorySafe_CartVect> origpointvec = new List<Vector.MemorySafe_CartVect>();
+            List<Vector.MemorySafe_CartVect> centpointvec = new List<Vector.MemorySafe_CartVect>();
             try
             {
                 //point vectors of the origninal coordinates
-                origpointvec = MakePointVecDict(coordlist);
+                origpointvec = MakePointVecList(coordlist);
                 if (origpointvec.Count == 0)
                 {
                     //throw an error
@@ -416,15 +432,17 @@ namespace VectorMath
 
                 //create a new list of coordinates to make a vector dictionary based on the centroid
                 List<MemorySafe_CartCoord> centroidcoords = new List<MemorySafe_CartCoord>();
+                List<MemorySafe_CartCoord> shuffledcoords = new List<MemorySafe_CartCoord>();
                 for (int i = 1; i < coordlist.Count(); i++)
                 {
-                    
+                    shuffledcoords.Add(coordlist[i]);
                     centroidcoords.Add(coordlist[i]);
                     centroidcoords.Add(C);
                 }
+                shuffledcoords.Add(coordlist[0]);
                 centroidcoords.Add(coordlist[0]);
                 centroidcoords.Add(C);
-                centpointvec = MakeCentroidPointVecDict(centroidcoords);
+                centpointvec = MakeCentroidPointVecList(centroidcoords);
                 if (centpointvec.Count == 0)
                 {
                     //throw some sort of exception
@@ -433,7 +451,7 @@ namespace VectorMath
                 //start the algorithm for vector translation and new point definitions
                 for (int i = 0; i < origpointvec.Count(); i++)
                 {
-                    Vector.MemorySafe_CartVect L1 = origpointvec[coordlist[i]];
+                    Vector.MemorySafe_CartVect L1 = origpointvec[i];
                     Vector.MemorySafe_CartCoord P11 = coordlist[i];
                     Vector.MemorySafe_CartCoord P12 = SumPointAndLine(P11, L1);
 
@@ -447,10 +465,15 @@ namespace VectorMath
 
                     MemorySafe_CartVect perimnormal = new MemorySafe_CartVect(normalunit.X * perimdepth, normalunit.Y * perimdepth, normalunit.Z * perimdepth);
                     Vector.MemorySafe_CartCoord transP11 = new MemorySafe_CartCoord(P11.X + perimnormal.X, P11.Y + perimnormal.Y, P11.Z + perimnormal.Z);
-                    Vector.MemorySafe_CartCoord transP12 = new MemorySafe_CartCoord(P12.X + perimnormal.X, P12.Y + perimnormal.Y, P12.Y + perimnormal.Z);
+                    Vector.MemorySafe_CartCoord transP12 = new MemorySafe_CartCoord(P12.X + perimnormal.X, P12.Y + perimnormal.Y, P12.Z + perimnormal.Z);
 
-                    Vector.MemorySafe_CartVect L2 = centpointvec[P12];
+                    //January 13 2014 - :
+                    //
+
+                    Vector.MemorySafe_CartVect L2 = centpointvec[i];
                     Vector.MemorySafe_CartCoord P21 = P12;
+                    //alternative to above
+                    //Vector.MemorySafe_CartCoord P21 = shuffledcoords[i];
                     Vector.MemorySafe_CartCoord P22 = C;
 
                     double[] arr1 = new double[3];
@@ -490,13 +513,12 @@ namespace VectorMath
                         MemorySafe_CartCoord intersection = new MemorySafe_CartCoord(xint, yint, 0);
                         intlist.Add(intersection);
                     }
-
-                    retlist.Add(intlist);
-                    //Vector.MemorySafe_CartVect L2 = origpointvec[coords[j + k]];
-                    //Vector.MemorySafe_CartCoord P21 = coords[j + k];
-                    //Vector.MemorySafe_CartCoord P22 = SumPointAndLine(P21, L2);
+                    else
+                    {
+                        //this seems pretty bad
+                    }
                 }
-
+                retlist.Add(intlist);
 
             }
             catch (Exception e)
@@ -504,6 +526,30 @@ namespace VectorMath
                 e.ToString();
             }
             return retlist;
+        }
+
+        public static Dictionary<MemorySafe_LongCoord, MemorySafe_CartVect> MakeLongPointVec(Dictionary<MemorySafe_CartCoord, MemorySafe_CartVect> centpointvec)
+        {
+            Dictionary<MemorySafe_LongCoord, MemorySafe_CartVect> longcentdict = new Dictionary<MemorySafe_LongCoord, MemorySafe_CartVect>();
+            foreach (KeyValuePair<MemorySafe_CartCoord, MemorySafe_CartVect> kp in centpointvec)
+            {
+                //this number is arbitrary but necessary
+                long X = Convert.ToInt64(kp.Key.X * 100000000);
+                long Y = Convert.ToInt64(kp.Key.Y * 100000000);
+                long Z = Convert.ToInt64(kp.Key.Z * 100000000);
+                MemorySafe_LongCoord lc = new MemorySafe_LongCoord(X, Y, Z);
+                longcentdict[lc] = kp.Value;
+            }
+            return longcentdict;
+        }
+
+        public static MemorySafe_LongCoord ConvertCoordToLong(MemorySafe_CartCoord P12)
+        {
+            long X = Convert.ToInt64(P12.X * 100000000);
+            long Y = Convert.ToInt64(P12.Y * 100000000);
+            long Z = Convert.ToInt64(P12.Z * 100000000);
+            MemorySafe_LongCoord lc = new MemorySafe_LongCoord(X, Y, Z);
+            return lc;
         }
 
         public static Dictionary<MemorySafe_CartCoord, MemorySafe_CartVect> MakeCentroidPointVecDict(List<MemorySafe_CartCoord> centroidcoords)
@@ -518,6 +564,28 @@ namespace VectorMath
                 {
                     MemorySafe_CartVect vec = CreateMemorySafe_Vector(centroidcoords[i], centroidcoords[i + 1]);
                     pointvec[centroidcoords[i]] = vec;
+                    i++;
+                }
+                return pointvec;
+            }
+            catch (Exception e)
+            {
+                throw e;
+            }
+        }
+
+        public static List<MemorySafe_CartVect> MakeCentroidPointVecList(List<MemorySafe_CartCoord> centroidcoords)
+        {
+            List<Vector.MemorySafe_CartVect> pointvec = new List<MemorySafe_CartVect>();
+            try
+            {
+                //turn coordinates into a point vector dictionary
+                //we can assume for now that the floor plane represented by the coordinates is in the X,Y Plane
+                int coordCount = centroidcoords.Count;
+                for (int i = 0; i < coordCount; i++)
+                {
+                    MemorySafe_CartVect vec = CreateMemorySafe_Vector(centroidcoords[i], centroidcoords[i + 1]);
+                    pointvec.Add(vec);
                     i++;
                 }
                 return pointvec;
@@ -603,6 +671,39 @@ namespace VectorMath
                     {
                         Vector.MemorySafe_CartVect v1 = Vector.CreateMemorySafe_Vector(coords[i], coords[0]);
                         pointvec[coords[i]] = v1;
+                        log.Debug("Vector " + i + ": (" + coords[i].X + "," + coords[i].Y + "," + coords[i].Z + ");[" + v1.X + "," + v1.Y + "," + v1.Z + "]");
+                    }
+
+                }
+            }
+            catch (Exception e)
+            {
+                log.Error(e.ToString());
+            }
+            return pointvec;
+        }
+
+        public static List<Vector.MemorySafe_CartVect> MakePointVecList(List<Vector.MemorySafe_CartCoord> coords)
+        {
+            List<Vector.MemorySafe_CartVect> pointvec = new List<MemorySafe_CartVect>();
+            try
+            {
+                //turn coordinates into a point vector dictionary
+                //we can assume for now that the floor plane represented by the coordinates is in the X,Y Plane
+                int coordCount = coords.Count;
+                for (int i = 0; i < coordCount; i++)
+                {
+
+                    if (i < coordCount - 1)
+                    {
+                        Vector.MemorySafe_CartVect v1 = Vector.CreateMemorySafe_Vector(coords[i], coords[i + 1]);
+                        pointvec.Add(v1);
+                        log.Debug("Vector " + i + ": (" + coords[i].X + "," + coords[i].Y + "," + coords[i].Z + ");[" + v1.X + "," + v1.Y + "," + v1.Z + "]");
+                    }
+                    else
+                    {
+                        Vector.MemorySafe_CartVect v1 = Vector.CreateMemorySafe_Vector(coords[i], coords[0]);
+                        pointvec.Add(v1);
                         log.Debug("Vector " + i + ": (" + coords[i].X + "," + coords[i].Y + "," + coords[i].Z + ");[" + v1.X + "," + v1.Y + "," + v1.Z + "]");
                     }
 
