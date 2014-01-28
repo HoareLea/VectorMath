@@ -411,9 +411,9 @@ namespace VectorMath
             return false;
         }
 
-        public static List<List<MemorySafe_CartCoord>> ScalePolygon(List<MemorySafe_CartCoord> coordlist, double perimdepth, bool isRegular)
+        public static List<MemorySafe_CartCoord> ScalePolygonByPerimDepth(List<MemorySafe_CartCoord> coordlist, double perimdepth, bool isRegular)
         {
-            List<List<MemorySafe_CartCoord>> retlist = new List<List<MemorySafe_CartCoord>>();
+            
             //list of all the coordinates that intersect
             List<MemorySafe_CartCoord> intlist = new List<MemorySafe_CartCoord>();
             List<Vector.MemorySafe_CartVect> origpointvec = new List<Vector.MemorySafe_CartVect>();
@@ -426,7 +426,7 @@ namespace VectorMath
                 {
                     //throw an error
                 }
-                retlist.Add(coordlist);
+                
                 //find centroid, to create the proper vector framework
                 MemorySafe_CartCoord C = GetCentroid(coordlist, isRegular);
 
@@ -518,14 +518,102 @@ namespace VectorMath
                         //this seems pretty bad
                     }
                 }
-                retlist.Add(intlist);
+                //reshuffle intlist
+                MemorySafe_CartCoord firstcoord = intlist.Last();
+                intlist.Remove(firstcoord);
+                intlist.Insert(0, firstcoord);
+                return intlist;
 
             }
             catch (Exception e)
             {
                 e.ToString();
             }
-            return retlist;
+            return intlist;
+        }
+
+        public static List<MemorySafe_CartCoord> ScalePolygonByFactor(List<MemorySafe_CartCoord> coordlist, double pct, bool isRegular)
+        {
+            List<MemorySafe_CartCoord> retlist = new List<MemorySafe_CartCoord>();
+            //list of all the coordinates that intersect
+            List<MemorySafe_CartCoord> intlist = new List<MemorySafe_CartCoord>();
+            List<Vector.MemorySafe_CartVect> origpointvec = new List<Vector.MemorySafe_CartVect>();
+            List<Vector.MemorySafe_CartVect> centpointvec = new List<Vector.MemorySafe_CartVect>();
+            try
+            {
+                //point vectors of the origninal coordinates
+                origpointvec = MakePointVecList(coordlist);
+                if (origpointvec.Count == 0)
+                {
+                    //throw an error
+                }
+                //find centroid, to create the proper vector framework
+                MemorySafe_CartCoord C = GetCentroid(coordlist, isRegular);
+
+                //create a new list of coordinates to make a vector dictionary based on the centroid
+                List<MemorySafe_CartCoord> centroidcoords = new List<MemorySafe_CartCoord>();
+                List<MemorySafe_CartCoord> shuffledcoords = new List<MemorySafe_CartCoord>();
+                for (int i = 1; i < coordlist.Count(); i++)
+                {
+                    shuffledcoords.Add(coordlist[i]);
+                    centroidcoords.Add(coordlist[i]);
+                    centroidcoords.Add(C);
+                }
+                shuffledcoords.Add(coordlist[0]);
+                centroidcoords.Add(coordlist[0]);
+                centroidcoords.Add(C);
+                centpointvec = MakeCentroidPointVecList(centroidcoords);
+                if (centpointvec.Count == 0)
+                {
+                    //throw some sort of exception
+                }
+                //shuffle vectorlist
+                MemorySafe_CartVect firstvect = centpointvec.Last();
+                centpointvec.Remove(firstvect);
+                centpointvec.Insert(0, firstvect);
+
+                //start the algorithm for new scaled polygon
+                for (int i = 0; i < centpointvec.Count(); i++)
+                {
+                    double coreX = coordlist[i].X + centpointvec[i].X * (1 - pct);
+                    double coreY = coordlist[i].Y + centpointvec[i].Y * (1 - pct);
+                    double coreZ = coordlist[i].Z + centpointvec[i].Z * (1 - pct);
+                    MemorySafe_CartCoord corecoord = new MemorySafe_CartCoord(coreX, coreY, coreZ);
+                    retlist.Add(corecoord);
+                }
+                return retlist;
+
+            }
+            catch (Exception e)
+            {
+                e.ToString();
+                throw e;
+            }
+            
+        }
+
+        public static List<List<Vector.MemorySafe_CartCoord>> FinishCore(List<List<MemorySafe_CartCoord>> cds, double pct, bool isRegular)
+        {
+            //Jan 14 - simple scaling algorithm that does not really look to verify the result or ensure it meets any complex area requirements
+            List<List<List<Vector.MemorySafe_CartCoord>>> returncoords = new List<List<List<MemorySafe_CartCoord>>>();
+            try
+            {
+                
+                double grossarea = GetAreaFrom2DPolyLoop(cds[0]);
+                double corearea = GetAreaFrom2DPolyLoop(cds[1]);
+                double servicecorearea = grossarea * pct;
+                double coreratio = servicecorearea / corearea;
+                //get a new depth based upon these calculated values, then scale polygon
+                //to find new depth, we actually don't know of a mathematical way to do this, so we use an iterative approach
+                List<MemorySafe_CartCoord> corepoints = ScalePolygonByFactor(cds[0], pct, isRegular);
+                cds.Add(corepoints);
+
+                return cds;
+            }
+            catch (Exception e)
+            {
+                throw e;
+            }
         }
 
         public static Dictionary<MemorySafe_LongCoord, MemorySafe_CartVect> MakeLongPointVec(Dictionary<MemorySafe_CartCoord, MemorySafe_CartVect> centpointvec)
@@ -1503,6 +1591,120 @@ namespace VectorMath
             
         }
 
+        //public static double GetAreaofPolyList(List<Vector.MemorySafe_CartCoord> coordlist)
+        //{
+        //    //Used to figure out how best to calculate the area from a given surfacce. 
+        //    //Get the coordinates that define the surface
+        //    //get the area based on the coordinates
+
+        //    //Get the RHRVector (the actual direction is not important
+        //    MemorySafe_CartVect RHRVector = GetMemRHR(coordlist);
+
+        //    //now that I have this, I can move on
+
+        //    //there are two basic cases for calculating the area that we cover here, 
+        //    //one where we get the area using greens theorem when the surface is parallel to one of the axes of the project global reference frame
+        //    //and the second where the surface is not parallel to one of the axes of the global reference frame
+
+        //    //Surface normal Parallel to global reference frame X Axis
+        //    if (Math.Abs(RHRVector.X) == 1 && RHRVector.Y == 0 && RHRVector.Z == 0)
+        //    {
+        //        List<Vector.CartCoord> coordList = new List<Vector.CartCoord>();
+        //        foreach (Vector.CartCoord coord in coordList)
+        //        {
+        //            //only take the Y and Z coordinates and throw out the X because we can assume that they are all the same
+        //            coord.X = 0;
+        //            double Y = surface.SurfaceCoords[i].Y;
+        //            double Z = surface.SurfaceCoords[i].Z;
+        //            Vector.MemorySafe_CartCoord coord = new MemorySafe_CartCoord(X, Y, Z);
+        //            coordList.Add(coord);
+
+        //        }
+        //        double area = GetAreaFrom2DPolyLoop(coordList);
+        //        return area;
+
+
+        //    }
+        //    //Surface normal Parallel to global reference frame y Axis
+        //    else if (RHRVector.X == 0 && Math.Abs(RHRVector.Y) == 1 && RHRVector.Z == 0)
+        //    {
+        //        List<Vector.CartCoord> coordList = new List<Vector.CartCoord>();
+        //        foreach (Vector.CartCoord coord in surface.SurfaceCoords)
+        //        {
+        //            //only take the X and Z coordinates and throw out the Y because we can assume that they are all the same
+        //            coord.Y = 0;
+        //            coordList.Add(coord);
+
+        //        }
+        //        double area = GetAreaFrom2DPolyLoop(coordList);
+        //        return area;
+        //    }
+        //    else if (RHRVector.X == 0 && RHRVector.Y == 0 && Math.Abs(RHRVector.Z) == 1)
+        //    {
+        //        List<Vector.CartCoord> coordList = new List<Vector.CartCoord>();
+        //        foreach (Vector.CartCoord coord in surface.SurfaceCoords)
+        //        {
+        //            //only take the X and Y coordinates and throw out the Z because we can assume that they are all the same
+        //            coord.Z = 0;
+        //            coordList.Add(coord);
+
+        //        }
+        //        double area = GetAreaFrom2DPolyLoop(coordList);
+        //        return area;
+        //    }
+
+        //    //the surface is not aligned with one of the reference frame axes, which requires a bit more work to determine the right answer.
+        //    else
+        //    {
+
+        //        //New Z Axis for this plane is the normal vector already calculated, does not need to be created
+        //        //Get New Y Axis which is the surface Normal Vector cross the original global reference X unit vector (all unit vectors please
+        //        Vector.CartVect localY = new Vector.CartVect();
+        //        Vector.CartVect globalReferenceX = new Vector.CartVect();
+        //        globalReferenceX.X = 1;
+        //        globalReferenceX.Y = 0;
+        //        globalReferenceX.Z = 0;
+        //        localY = Vector.CrossProduct(RHRVector, globalReferenceX);
+        //        localY = Vector.UnitVector(localY);
+
+        //        //new X axis is the localY cross the surface normal vector
+        //        Vector.CartVect localX = new Vector.CartVect();
+        //        localX = Vector.CrossProduct(localY, RHRVector);
+        //        localX = Vector.UnitVector(localX);
+
+        //        //convert the polyloop coordinates to a local 2-D reference frame
+        //        //using a trick employed by video game programmers found here http://stackoverflow.com/questions/1023948/rotate-normal-vector-onto-axis-plane
+        //        List<Vector.CartCoord> translatedCoordinates = new List<Vector.CartCoord>();
+        //        //put the origin in place in these translated coordinates since our loop skips over this first arbitrary point
+        //        Vector.CartCoord newOrigin = new Vector.CartCoord();
+        //        newOrigin.X = 0;
+        //        newOrigin.Y = 0;
+        //        newOrigin.Z = 0;
+        //        translatedCoordinates.Add(newOrigin);
+        //        for (int j = 1; j < surface.SurfaceCoords.Count; j++)
+        //        {
+        //            //randomly assigns the first polyLoop coordinate as the origin
+        //            Vector.CartCoord origin = surface.SurfaceCoords[0];
+        //            //captures the components of a vector drawn from the new origin to the 
+        //            Vector.CartVect distance = new Vector.CartVect();
+        //            distance.X = surface.SurfaceCoords[j].X - origin.X;
+        //            distance.Y = surface.SurfaceCoords[j].Y - origin.Y;
+        //            distance.Z = surface.SurfaceCoords[j].Z - origin.Z;
+        //            Vector.CartCoord translatedPt = new Vector.CartCoord();
+        //            //x coordinate is distance vector dot the new local X axis
+        //            translatedPt.X = distance.X * localX.X + distance.Y * localX.Y + distance.Z * localX.Z;
+        //            //y coordinate is distance vector dot the new local Y axis
+        //            translatedPt.Y = distance.X * localY.X + distance.Y * localY.Y + distance.Z * localY.Z;
+        //            translatedPt.Z = 0;
+        //            translatedCoordinates.Add(translatedPt);
+
+        //        }
+        //        double area = GetAreaFrom2DPolyLoop(translatedCoordinates);
+        //        return area;
+        //    }
+
+        //}
+
         public static double GetAreaofSurface(ModelingUtilities.BuildingObjects.MemorySafe_Surface surface)
         {
             //Used to figure out how best to calculate the area from a given surfacce. 
@@ -1510,7 +1712,7 @@ namespace VectorMath
             //get the area based on the coordinates
 
             //Get the RHRVector (the actual direction is not important
-            MemorySafe_CartVect RHRVector = GetRHR(surface.SurfaceCoords);
+            MemorySafe_CartVect RHRVector = GetMemRHR(surface.SurfaceCoords);
 
             //now that I have this, I can move on
 
@@ -1619,6 +1821,51 @@ namespace VectorMath
 
         }
 
+        public static List<Vector.MemorySafe_CartCoord> flattenPolyLoop(List<Vector.MemorySafe_CartCoord> coordlist)
+        {
+
+            MemorySafe_CartVect RHRVector = GetMemRHR(coordlist);
+            //New Z Axis for this plane is the normal vector already calculated, does not need to be created
+                //Get New Y Axis which is the surface Normal Vector cross the original global reference X unit vector (all unit vectors please
+                double X = 1;
+                double Y = 0;
+                double Z = 0;
+                Vector.MemorySafe_CartVect globalReferenceX = new Vector.MemorySafe_CartVect(X,Y,Z);
+
+                Vector.MemorySafe_CartVect localY = Vector.CrossProduct(RHRVector, globalReferenceX);
+                localY = Vector.UnitVector(localY);
+
+                //new X axis is the localY cross the surface normal vector
+                Vector.MemorySafe_CartVect localX = Vector.CrossProduct(localY, RHRVector);
+                localX = Vector.UnitVector(localX);
+
+                //convert the polyloop coordinates to a local 2-D reference frame
+                //using a trick employed by video game programmers found here http://stackoverflow.com/questions/1023948/rotate-normal-vector-onto-axis-plane
+                List<Vector.MemorySafe_CartCoord> translatedCoordinates = new List<Vector.MemorySafe_CartCoord>();
+                //put the origin in place in these translated coordinates since our loop skips over this first arbitrary point
+                double originX = 0;
+                double originY = 0;
+                double originZ = 0;
+                Vector.MemorySafe_CartCoord newOrigin = new Vector.MemorySafe_CartCoord(originX, originY, originZ);
+                translatedCoordinates.Add(newOrigin);
+                for (int j = 1; j < coordlist.Count; j++)
+                {
+                    //randomly assigns the first polyLoop coordinate as the origin
+                    Vector.MemorySafe_CartCoord origin = coordlist[0];
+                    //captures the components of a vector drawn from the new origin to the 
+                    double xDistance = coordlist[j].X - origin.X;
+                    double yDist = coordlist[j].Y - origin.Y;
+                    double zDist = coordlist[j].Z - origin.Z;
+                    Vector.MemorySafe_CartVect distance = new Vector.MemorySafe_CartVect(xDistance, yDist, zDist);
+                    double translPtX = distance.X * localX.X + distance.Y * localX.Y + distance.Z * localX.Z;
+                    double translPtY = distance.X * localY.X + distance.Y * localY.Y + distance.Z * localY.Z;
+                    double translPtZ = 0;
+                    Vector.MemorySafe_CartCoord translatedPt = new Vector.MemorySafe_CartCoord(translPtX, translPtY, translPtZ);
+                    translatedCoordinates.Add(translatedPt);
+                }
+                return translatedCoordinates;
+        }
+
         public static double GetAreaofWindow(ModelingUtilities.BuildingObjects.MemorySafe_OpeningDefinitions opening)
         {
             //Used to figure out how best to calculate the area from a given surfacce. 
@@ -1626,7 +1873,7 @@ namespace VectorMath
             //get the area based on the coordinates
 
             //Get the RHRVector (the actual direction is not important
-            MemorySafe_CartVect RHRVector = GetRHR(opening.coordinateList);
+            MemorySafe_CartVect RHRVector = GetMemRHR(opening.coordinateList);
 
             //now that I have this, I can move on
 
@@ -1792,7 +2039,7 @@ namespace VectorMath
             }
         }
 
-        public static Vector.MemorySafe_CartVect GetRHR(List<Vector.MemorySafe_CartCoord> plCoords)
+        public static Vector.MemorySafe_CartVect GetMemRHR(List<Vector.MemorySafe_CartCoord> plCoords)
         {
             Vector.CartVect plRHRVect = new Vector.CartVect();
             //this list will store all of the rhr values returned by any arbitrary polyloop
