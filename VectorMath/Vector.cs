@@ -1591,6 +1591,135 @@ namespace VectorMath
             
         }
 
+        //CHarriman Feb 14 2014 <3<3<3
+        //a revision of the get area of a surface.  Used in the Rhino Grasshopper library
+        public static double GetAreaofMemSafeCoords(List<Vector.MemorySafe_CartCoord> coords)
+        {
+            //Used to figure out how best to calculate the area from a given surfacce. 
+            //Get the coordinates that define the surface
+            //get the area based on the coordinates
+
+            //Get the RHRVector (the actual direction is not important
+            MemorySafe_CartVect RHRVector = GetMemRHR(coords);
+
+            //now that I have this, I can move on
+
+            //there are two basic cases for calculating the area that we cover here, 
+            //one where we get the area using greens theorem when the surface is parallel to one of the axes of the project global reference frame
+            //and the second where the surface is not parallel to one of the axes of the global reference frame
+
+            //Surface normal Parallel to global reference frame X Axis
+            if (Math.Abs(RHRVector.X) == 1 && RHRVector.Y == 0 && RHRVector.Z == 0)
+            {
+                List<CartCoord> coordList = new List<CartCoord>();
+                foreach (MemorySafe_CartCoord coord in coords)
+                {
+                    //only take the Y and Z coordinates and throw out the X because we can assume that they are all the same
+                    CartCoord tempcoord = new CartCoord();
+                    tempcoord.X = 0;
+                    tempcoord.Y = coord.Y;
+                    tempcoord.Z = coord.Z;
+                    coordList.Add(tempcoord);
+
+                }
+                double area = GetAreaFrom2DPolyLoop(coordList);
+                return area;
+
+
+            }
+            //Surface normal Parallel to global reference frame y Axis
+            else if (RHRVector.X == 0 && Math.Abs(RHRVector.Y) == 1 && RHRVector.Z == 0)
+            {
+                List<Vector.CartCoord> coordList = new List<Vector.CartCoord>();
+                foreach (MemorySafe_CartCoord coord in coords)
+                {
+                    //only take the X and Z coordinates and throw out the Y because we can assume that they are all the same
+                    CartCoord tempcoord = new CartCoord();
+                    tempcoord.X = coord.X;
+                    tempcoord.Y = 0;
+                    tempcoord.Z = coord.Z;
+                    coordList.Add(tempcoord);
+
+                }
+                double area = GetAreaFrom2DPolyLoop(coordList);
+                return area;
+            }
+            else if (RHRVector.X == 0 && RHRVector.Y == 0 && Math.Abs(RHRVector.Z) == 1)
+            {
+                List<Vector.CartCoord> coordList = new List<Vector.CartCoord>();
+                foreach (MemorySafe_CartCoord coord in coords)
+                {
+                    //only take the X and Y coordinates and throw out the Z because we can assume that they are all the same
+                    CartCoord tempcoord = new CartCoord();
+                    tempcoord.X = coord.X;
+                    tempcoord.Y = coord.Y;
+                    tempcoord.Z = 0;
+                    coordList.Add(tempcoord);
+
+                }
+                double area = GetAreaFrom2DPolyLoop(coordList);
+                return area;
+            }
+
+            //the surface is not aligned with one of the reference frame axes, which requires a bit more work to determine the right answer.
+            else
+            {
+
+                //New Z Axis for this plane is the normal vector already calculated, does not need to be created
+                //Get New Y Axis which is the surface Normal Vector cross the original global reference X unit vector (all unit vectors please
+
+                CartVect globalReferenceX = new CartVect();
+                globalReferenceX.X = 1;
+                globalReferenceX.Y = 0;
+                globalReferenceX.Z = 0;
+
+                CartVect localY = CrossProductNVRetMSNV(RHRVector, globalReferenceX);
+                localY = UnitVector(localY);
+
+                
+                //new X axis is the localY cross the surface normal vector
+                Vector.CartVect localX = new Vector.CartVect();
+
+                localX = CrossProductNVRetNVMS(localY, RHRVector);
+                localX = Vector.UnitVector(localX);
+
+                //convert the polyloop coordinates to a local 2-D reference frame
+                //using a trick employed by video game programmers found here http://stackoverflow.com/questions/1023948/rotate-normal-vector-onto-axis-plane
+                List<Vector.CartCoord> translatedCoordinates = new List<Vector.CartCoord>();
+                //put the origin in place in these translated coordinates since our loop skips over this first arbitrary point
+                Vector.CartCoord newOrigin = new Vector.CartCoord();
+                newOrigin.X = 0;
+                newOrigin.Y = 0;
+                newOrigin.Z = 0;
+                translatedCoordinates.Add(newOrigin);
+                for (int j = 1; j < coords.Count; j++)
+                {
+                    //randomly assigns the first polyLoop coordinate as the origin
+                    Vector.CartCoord origin = new CartCoord();
+                    origin.X = coords[0].X;
+                    origin.Y = coords[0].Y;
+                    origin.Z = coords[0].Z;
+                    //captures the components of a vector drawn from the new origin to the 
+                    Vector.CartVect distance = new Vector.CartVect();
+                    
+                    distance.X = coords[j].X - origin.X;
+                    distance.Y = coords[j].Y - origin.Y;
+                    distance.Z = coords[j].Z - origin.Z;
+                    Vector.CartCoord translatedPt = new Vector.CartCoord();
+                    //x coordinate is distance vector dot the new local X axis
+                    translatedPt.X = distance.X * localX.X + distance.Y * localX.Y + distance.Z * localX.Z;
+                    //y coordinate is distance vector dot the new local Y axis
+                    translatedPt.Y = distance.X * localY.X + distance.Y * localY.Y + distance.Z * localY.Z;
+                    translatedPt.Z = 0;
+                    translatedCoordinates.Add(translatedPt);
+
+                }
+                double area = GetAreaFrom2DPolyLoop(translatedCoordinates);
+                return area;
+            }
+
+        }
+
         //public static double GetAreaofPolyList(List<Vector.MemorySafe_CartCoord> coordlist)
         //{
         //    //Used to figure out how best to calculate the area from a given surfacce. 
