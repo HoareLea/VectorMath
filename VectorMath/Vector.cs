@@ -39,6 +39,22 @@ namespace VectorMath
             public double Z { get { return _Z; } }
         }
 
+        public class MemorySafe_LongCoord
+        {
+            private readonly long _X, _Y, _Z;
+
+            public MemorySafe_LongCoord(long X, long Y, long Z)
+            {
+                _X = X;
+                _Y = Y;
+                _Z = Z;
+            }
+
+            public long X { get { return _X; } }
+            public long Y { get { return _Y; } }
+            public long Z { get { return _Z; } }
+        }
+
         public class CartVect
         {
             public CartVect()
@@ -249,6 +265,35 @@ namespace VectorMath
             return xProd;
         }
 
+        public static double DotProduct(MemorySafe_CartVect v1, MemorySafe_CartVect v2)
+        {
+            try
+            {
+                //dot product definition
+                return v1.X * v2.X + v1.Y * v2.Y + v1.Z * v2.Z;
+            }
+            catch (Exception e)
+            {
+                log.Debug("DotProduct Failed." +e.ToString());
+                throw e;
+            }
+        }
+
+        public static double GetAngle(MemorySafe_CartVect v1, MemorySafe_CartVect v2)
+        {
+            try
+            {
+                double dot = DotProduct(v1, v2);
+                double angle = (180/Math.PI) * Math.Acos(dot / (Vector.VectorMagnitude(v1) * Vector.VectorMagnitude(v2)));
+                return angle;
+            }
+            catch (Exception e)
+            {
+                log.Debug("Get Angle Failed: " + e.ToString());
+                throw e;
+            }
+        }
+
         public static WalkDirection isCounterClockwise(List<MemorySafe_CartCoord> coords)
         {
             WalkDirection wd = new WalkDirection();
@@ -366,6 +411,300 @@ namespace VectorMath
             return false;
         }
 
+        public static List<MemorySafe_CartCoord> ScalePolygonByPerimDepth(List<MemorySafe_CartCoord> coordlist, double perimdepth, bool isRegular)
+        {
+            
+            //list of all the coordinates that intersect
+            List<MemorySafe_CartCoord> intlist = new List<MemorySafe_CartCoord>();
+            List<Vector.MemorySafe_CartVect> origpointvec = new List<Vector.MemorySafe_CartVect>();
+            List<Vector.MemorySafe_CartVect> centpointvec = new List<Vector.MemorySafe_CartVect>();
+            try
+            {
+                //point vectors of the origninal coordinates
+                origpointvec = MakePointVecList(coordlist);
+                if (origpointvec.Count == 0)
+                {
+                    //throw an error
+                }
+                
+                //find centroid, to create the proper vector framework
+                MemorySafe_CartCoord C = GetCentroid(coordlist, isRegular);
+
+                //create a new list of coordinates to make a vector dictionary based on the centroid
+                List<MemorySafe_CartCoord> centroidcoords = new List<MemorySafe_CartCoord>();
+                List<MemorySafe_CartCoord> shuffledcoords = new List<MemorySafe_CartCoord>();
+                for (int i = 1; i < coordlist.Count(); i++)
+                {
+                    shuffledcoords.Add(coordlist[i]);
+                    centroidcoords.Add(coordlist[i]);
+                    centroidcoords.Add(C);
+                }
+                shuffledcoords.Add(coordlist[0]);
+                centroidcoords.Add(coordlist[0]);
+                centroidcoords.Add(C);
+                centpointvec = MakeCentroidPointVecList(centroidcoords);
+                if (centpointvec.Count == 0)
+                {
+                    //throw some sort of exception
+                }
+
+                //start the algorithm for vector translation and new point definitions
+                for (int i = 0; i < origpointvec.Count(); i++)
+                {
+                    Vector.MemorySafe_CartVect L1 = origpointvec[i];
+                    Vector.MemorySafe_CartCoord P11 = coordlist[i];
+                    Vector.MemorySafe_CartCoord P12 = SumPointAndLine(P11, L1);
+
+                    MemorySafe_CartCoord midpoint = GetMidpoint(P11, P12);
+                    List<double> slope = GetSlopeComponents(P11, P12);
+                    double[] normalm = new double[2];
+                    normalm[0] = slope[1]*-1;
+                    normalm[1] = slope[0];
+                    double magn = Math.Sqrt(Math.Pow(normalm[0], 2) + Math.Pow(normalm[1], 2));
+                    MemorySafe_CartVect normalunit = new MemorySafe_CartVect(normalm[0] / magn, normalm[1] / magn, 0);
+
+                    MemorySafe_CartVect perimnormal = new MemorySafe_CartVect(normalunit.X * perimdepth, normalunit.Y * perimdepth, normalunit.Z * perimdepth);
+                    Vector.MemorySafe_CartCoord transP11 = new MemorySafe_CartCoord(P11.X + perimnormal.X, P11.Y + perimnormal.Y, P11.Z + perimnormal.Z);
+                    Vector.MemorySafe_CartCoord transP12 = new MemorySafe_CartCoord(P12.X + perimnormal.X, P12.Y + perimnormal.Y, P12.Z + perimnormal.Z);
+
+                    //January 13 2014 - :
+                    //
+
+                    Vector.MemorySafe_CartVect L2 = centpointvec[i];
+                    Vector.MemorySafe_CartCoord P21 = P12;
+                    //alternative to above
+                    //Vector.MemorySafe_CartCoord P21 = shuffledcoords[i];
+                    Vector.MemorySafe_CartCoord P22 = C;
+
+                    double[] arr1 = new double[3];
+                    double A1 = transP11.Y - transP12.Y;
+                    double B1 = transP12.X - transP11.X;
+                    double C1 = A1 * transP11.X + B1 * transP11.Y;
+                    arr1[0] = A1;
+                    arr1[1] = B1;
+                    arr1[2] = C1;
+
+                    double[] arr2 = new double[3];
+                    double A2 = P21.Y - P22.Y;
+                    double B2 = P22.X - P21.X;
+                    double C2 = A2 * P21.X + B2 * P21.Y;
+                    arr2[0] = A2;
+                    arr2[1] = B2;
+                    arr2[2] = C2;
+
+                    double[][] comparr = new double[2][];
+                    comparr[0] = arr1;
+                    comparr[1] = arr2;
+                    comparr = ReducedRowEchelonForm(comparr);
+                    double xmin1 = Math.Min(transP11.X, transP12.X);
+                    double xmax1 = Math.Max(transP11.X, transP12.X);
+                    double xmin2 = Math.Min(P21.X, P22.X);
+                    double xmax2 = Math.Max(P21.X, P22.X);
+                    double ymin1 = Math.Min(transP11.Y, transP12.Y);
+                    double ymax1 = Math.Max(transP11.Y, transP12.Y);
+                    double ymin2 = Math.Min(P21.Y, P22.Y);
+                    double ymax2 = Math.Max(P21.Y, P22.Y);
+                    //if it reduces to reduced row echelon form, then extract the x and y coordinates
+                    if (comparr[0][0] == 1 && comparr[0][1] == 0 && comparr[1][0] == 0 && comparr[1][1] == 1)
+                    {
+                        //find the intersection point of this new translation with the centroidvectors
+                        double xint = comparr[0][2];
+                        double yint = comparr[1][2];
+                        MemorySafe_CartCoord intersection = new MemorySafe_CartCoord(xint, yint, 0);
+                        intlist.Add(intersection);
+                    }
+                    else
+                    {
+                        //this seems pretty bad
+                    }
+                }
+                //reshuffle intlist
+                MemorySafe_CartCoord firstcoord = intlist.Last();
+                intlist.Remove(firstcoord);
+                intlist.Insert(0, firstcoord);
+                return intlist;
+
+            }
+            catch (Exception e)
+            {
+                e.ToString();
+            }
+            return intlist;
+        }
+
+        public static List<MemorySafe_CartCoord> ScalePolygonByFactor(List<MemorySafe_CartCoord> coordlist, double pct, bool isRegular)
+        {
+            List<MemorySafe_CartCoord> retlist = new List<MemorySafe_CartCoord>();
+            //list of all the coordinates that intersect
+            List<MemorySafe_CartCoord> intlist = new List<MemorySafe_CartCoord>();
+            List<Vector.MemorySafe_CartVect> origpointvec = new List<Vector.MemorySafe_CartVect>();
+            List<Vector.MemorySafe_CartVect> centpointvec = new List<Vector.MemorySafe_CartVect>();
+            try
+            {
+                //point vectors of the origninal coordinates
+                origpointvec = MakePointVecList(coordlist);
+                if (origpointvec.Count == 0)
+                {
+                    //throw an error
+                }
+                //find centroid, to create the proper vector framework
+                MemorySafe_CartCoord C = GetCentroid(coordlist, isRegular);
+
+                //create a new list of coordinates to make a vector dictionary based on the centroid
+                List<MemorySafe_CartCoord> centroidcoords = new List<MemorySafe_CartCoord>();
+                List<MemorySafe_CartCoord> shuffledcoords = new List<MemorySafe_CartCoord>();
+                for (int i = 1; i < coordlist.Count(); i++)
+                {
+                    shuffledcoords.Add(coordlist[i]);
+                    centroidcoords.Add(coordlist[i]);
+                    centroidcoords.Add(C);
+                }
+                shuffledcoords.Add(coordlist[0]);
+                centroidcoords.Add(coordlist[0]);
+                centroidcoords.Add(C);
+                centpointvec = MakeCentroidPointVecList(centroidcoords);
+                if (centpointvec.Count == 0)
+                {
+                    //throw some sort of exception
+                }
+                //shuffle vectorlist
+                MemorySafe_CartVect firstvect = centpointvec.Last();
+                centpointvec.Remove(firstvect);
+                centpointvec.Insert(0, firstvect);
+
+                //start the algorithm for new scaled polygon
+                for (int i = 0; i < centpointvec.Count(); i++)
+                {
+                    double coreX = coordlist[i].X + centpointvec[i].X * (1 - pct);
+                    double coreY = coordlist[i].Y + centpointvec[i].Y * (1 - pct);
+                    double coreZ = coordlist[i].Z + centpointvec[i].Z * (1 - pct);
+                    MemorySafe_CartCoord corecoord = new MemorySafe_CartCoord(coreX, coreY, coreZ);
+                    retlist.Add(corecoord);
+                }
+                return retlist;
+
+            }
+            catch (Exception e)
+            {
+                e.ToString();
+                throw e;
+            }
+            
+        }
+
+        public static List<List<Vector.MemorySafe_CartCoord>> FinishCore(List<List<MemorySafe_CartCoord>> cds, double pct, bool isRegular)
+        {
+            //Jan 14 - simple scaling algorithm that does not really look to verify the result or ensure it meets any complex area requirements
+            List<List<List<Vector.MemorySafe_CartCoord>>> returncoords = new List<List<List<MemorySafe_CartCoord>>>();
+            try
+            {
+                
+                double grossarea = GetAreaFrom2DPolyLoop(cds[0]);
+                double corearea = GetAreaFrom2DPolyLoop(cds[1]);
+                double servicecorearea = grossarea * pct;
+                double coreratio = servicecorearea / corearea;
+                //get a new depth based upon these calculated values, then scale polygon
+                //to find new depth, we actually don't know of a mathematical way to do this, so we use an iterative approach
+                List<MemorySafe_CartCoord> corepoints = ScalePolygonByFactor(cds[0], pct, isRegular);
+                cds.Add(corepoints);
+
+                return cds;
+            }
+            catch (Exception e)
+            {
+                throw e;
+            }
+        }
+
+        public static Dictionary<MemorySafe_LongCoord, MemorySafe_CartVect> MakeLongPointVec(Dictionary<MemorySafe_CartCoord, MemorySafe_CartVect> centpointvec)
+        {
+            Dictionary<MemorySafe_LongCoord, MemorySafe_CartVect> longcentdict = new Dictionary<MemorySafe_LongCoord, MemorySafe_CartVect>();
+            foreach (KeyValuePair<MemorySafe_CartCoord, MemorySafe_CartVect> kp in centpointvec)
+            {
+                //this number is arbitrary but necessary
+                long X = Convert.ToInt64(kp.Key.X * 100000000);
+                long Y = Convert.ToInt64(kp.Key.Y * 100000000);
+                long Z = Convert.ToInt64(kp.Key.Z * 100000000);
+                MemorySafe_LongCoord lc = new MemorySafe_LongCoord(X, Y, Z);
+                longcentdict[lc] = kp.Value;
+            }
+            return longcentdict;
+        }
+
+        public static MemorySafe_LongCoord ConvertCoordToLong(MemorySafe_CartCoord P12)
+        {
+            long X = Convert.ToInt64(P12.X * 100000000);
+            long Y = Convert.ToInt64(P12.Y * 100000000);
+            long Z = Convert.ToInt64(P12.Z * 100000000);
+            MemorySafe_LongCoord lc = new MemorySafe_LongCoord(X, Y, Z);
+            return lc;
+        }
+
+        public static Dictionary<MemorySafe_CartCoord, MemorySafe_CartVect> MakeCentroidPointVecDict(List<MemorySafe_CartCoord> centroidcoords)
+        {
+            Dictionary<Vector.MemorySafe_CartCoord, Vector.MemorySafe_CartVect> pointvec = new Dictionary<MemorySafe_CartCoord, MemorySafe_CartVect>();
+            try
+            {
+                //turn coordinates into a point vector dictionary
+                //we can assume for now that the floor plane represented by the coordinates is in the X,Y Plane
+                int coordCount = centroidcoords.Count;
+                for (int i = 0; i < coordCount; i++)
+                {
+                    MemorySafe_CartVect vec = CreateMemorySafe_Vector(centroidcoords[i], centroidcoords[i + 1]);
+                    pointvec[centroidcoords[i]] = vec;
+                    i++;
+                }
+                return pointvec;
+            }
+            catch (Exception e)
+            {
+                throw e;
+            }
+        }
+
+        public static List<MemorySafe_CartVect> MakeCentroidPointVecList(List<MemorySafe_CartCoord> centroidcoords)
+        {
+            List<Vector.MemorySafe_CartVect> pointvec = new List<MemorySafe_CartVect>();
+            try
+            {
+                //turn coordinates into a point vector dictionary
+                //we can assume for now that the floor plane represented by the coordinates is in the X,Y Plane
+                int coordCount = centroidcoords.Count;
+                for (int i = 0; i < coordCount; i++)
+                {
+                    MemorySafe_CartVect vec = CreateMemorySafe_Vector(centroidcoords[i], centroidcoords[i + 1]);
+                    pointvec.Add(vec);
+                    i++;
+                }
+                return pointvec;
+            }
+            catch (Exception e)
+            {
+                throw e;
+            }
+        }
+
+        private static List<double> GetSlopeComponents(MemorySafe_CartCoord P11, MemorySafe_CartCoord P12)
+        {
+            List<double> components = new List<double>();
+            components.Add(P12.X - P11.X);
+            components.Add(P12.Y - P11.Y);
+            return components;
+        }
+
+        public static double GetSlope(MemorySafe_CartCoord P11, MemorySafe_CartCoord P12)
+        {
+            return (P12.Y - P11.Y) / (P12.Z - P11.X);
+        }
+
+        public static MemorySafe_CartCoord GetMidpoint(MemorySafe_CartCoord P11, MemorySafe_CartCoord P12)
+        {
+            double x = (P11.X + P12.X) / 2;
+            double y = (P11.Y + P12.Y) / 2;
+            double z = (P11.Z + P12.Z) / 2;
+            return new MemorySafe_CartCoord(x,y,z);
+        }
+
         //rseed
         public static bool BruteForceIntersectionTest(List<Vector.MemorySafe_CartCoord> coords)
         {
@@ -394,6 +733,11 @@ namespace VectorMath
             return false;
         }
 
+        public static void MakeBasicTemplate()
+        {
+
+        }
+
         public static Dictionary<Vector.MemorySafe_CartCoord, Vector.MemorySafe_CartVect> MakePointVecDict(List<Vector.MemorySafe_CartCoord> coords)
         {
             Dictionary<Vector.MemorySafe_CartCoord, Vector.MemorySafe_CartVect> pointvec = new Dictionary<MemorySafe_CartCoord, MemorySafe_CartVect>();
@@ -415,6 +759,39 @@ namespace VectorMath
                     {
                         Vector.MemorySafe_CartVect v1 = Vector.CreateMemorySafe_Vector(coords[i], coords[0]);
                         pointvec[coords[i]] = v1;
+                        log.Debug("Vector " + i + ": (" + coords[i].X + "," + coords[i].Y + "," + coords[i].Z + ");[" + v1.X + "," + v1.Y + "," + v1.Z + "]");
+                    }
+
+                }
+            }
+            catch (Exception e)
+            {
+                log.Error(e.ToString());
+            }
+            return pointvec;
+        }
+
+        public static List<Vector.MemorySafe_CartVect> MakePointVecList(List<Vector.MemorySafe_CartCoord> coords)
+        {
+            List<Vector.MemorySafe_CartVect> pointvec = new List<MemorySafe_CartVect>();
+            try
+            {
+                //turn coordinates into a point vector dictionary
+                //we can assume for now that the floor plane represented by the coordinates is in the X,Y Plane
+                int coordCount = coords.Count;
+                for (int i = 0; i < coordCount; i++)
+                {
+
+                    if (i < coordCount - 1)
+                    {
+                        Vector.MemorySafe_CartVect v1 = Vector.CreateMemorySafe_Vector(coords[i], coords[i + 1]);
+                        pointvec.Add(v1);
+                        log.Debug("Vector " + i + ": (" + coords[i].X + "," + coords[i].Y + "," + coords[i].Z + ");[" + v1.X + "," + v1.Y + "," + v1.Z + "]");
+                    }
+                    else
+                    {
+                        Vector.MemorySafe_CartVect v1 = Vector.CreateMemorySafe_Vector(coords[i], coords[0]);
+                        pointvec.Add(v1);
                         log.Debug("Vector " + i + ": (" + coords[i].X + "," + coords[i].Y + "," + coords[i].Z + ");[" + v1.X + "," + v1.Y + "," + v1.Z + "]");
                     }
 
@@ -462,149 +839,381 @@ namespace VectorMath
             return false;
         }
 
+        //private static bool CheckAdjacencyIntersections(Dictionary<Vector.MemorySafe_CartCoord, Vector.MemorySafe_CartVect> pointvec, List<Vector.MemorySafe_CartCoord> coords, int j)
+        //{
+        //    List<bool> IntTruth = new List<bool>();
+
+        //    try
+        //    {
+                
+        //        int coordCount = pointvec.Count();
+        //        log.Debug("Check Adjacency Intersections for vector " + j.ToString());
+
+        //        for (int k = 1; k < coordCount - j; k++)
+        //        {
+        //            Vector.MemorySafe_CartVect L1 = pointvec[coords[j]];
+        //            Vector.MemorySafe_CartCoord P1 = coords[j];
+
+        //            //log.Debug("Testing adjacent vector " + k.ToString());
+        //            Vector.MemorySafe_CartVect L2 = pointvec[coords[j + k]];
+        //            Vector.MemorySafe_CartCoord P2 = coords[j + k];
+
+        //            Vector.MemorySafe_CartVect tempvec = CreateMemorySafe_Vector(P1, P2);
+        //            Vector.MemorySafe_CartVect numcross = CrossProduct(tempvec, L2);
+        //            double numcrmag = VectorMagnitude(numcross);
+        //            Vector.MemorySafe_CartVect dencross = CrossProduct(L1, L2);
+        //            double dencrmag = VectorMagnitude(dencross);
+        //            //basic checks suggested:  are numcross and dencross parallel?
+        //            //is numcross not the zero vector?
+        //            if (numcrmag == 0 && dencrmag == 0)
+        //            {
+        //                //the two lines are clearly parallel
+                        
+        //                //not sure if this check is needed, but we ensure that these two parallel lines are unique and do not overlap
+        //                //it gets a bit more complicated from here
+                        
+        //                double p12x = P1.X + L1.X;
+        //                double p12y = P1.Y + L1.Y;
+        //                double p12z = P1.Z + L1.Z;
+        //                MemorySafe_CartCoord P12 = new Vector.MemorySafe_CartCoord(p12x,p12y,p12z);
+
+        //                double p22x = P2.X + L2.X;
+        //                double p22y = P2.Y + L2.Y;
+        //                double p22z = P2.Z + L2.Z;
+        //                MemorySafe_CartCoord P22 = new Vector.MemorySafe_CartCoord(p22x, p22y, p22z);
+        //                double diffx = P12.X - P1.X;
+        //                double diffy = P12.Y - P1.Y;
+        //                double p1xmin = Math.Min(P1.X, P12.X);
+        //                double p1xmax = Math.Max(P1.X, P12.X);
+        //                double p1ymin = Math.Min(P1.Y, P12.Y);
+        //                double p1ymax = Math.Max(P1.Y, P12.Y);
+        //                if (diffy == 0)
+        //                {
+        //                    //at this point all we need to do is check to see if X or Y of one vector fall into the range of the other
+        //                    if ((P2.X >= p1xmin && P2.X <= p1xmax) || (P22.X >= p1xmin && P22.X <= p1xmax))
+        //                    {
+        //                        log.Info("FAIL:  Lines intersect illegally.");
+        //                        return false;
+        //                    }
+        //                    else
+        //                    {
+        //                        IntTruth.Add(true);
+        //                        continue;
+        //                    }
+        //                }
+        //                else if (diffx == 0)
+        //                {
+        //                    //at this point all we need to do is check to see if X or Y of one vector fall into the range of the other
+        //                    if ((P2.Y >= p1ymin && P2.Y <= p1ymax) || (P22.Y >= p1ymin && P22.Y <= p1ymax))
+        //                    {
+        //                        log.Info("FAIL:  Lines intersect illegally.");
+        //                        return false;
+        //                    }
+        //                    else
+        //                    {
+        //                        IntTruth.Add(true);
+        //                        continue;
+        //                    }
+        //                }
+        //                else
+        //                {
+        //                    //I just need to see if the two lines intersect somewhere using common cartesian math
+        //                    double slope1 = diffy / diffx;
+        //                    double slope2 = (P22.Y - P2.Y) / (P22.X - P2.X);
+        //                    double b1 = slope1 * P1.X - P1.Y;
+        //                    double b2 = slope2 * P2.X - P2.Y;
+
+        //                    double xint = (b2 - b1) / (slope1 - slope2);
+        //                    double yint = slope1 * P1.X + b1;
+
+        //                    if ((xint >= p1xmin && xint <= p1xmax) || (yint >= p1ymin && yint <= p1ymax))
+        //                    {
+        //                        log.Info("FAIL:  Lines intersect illegally.");
+        //                        return false;
+        //                    }
+        //                    else
+        //                    {
+        //                        IntTruth.Add(true);
+        //                        continue;
+        //                    }
+
+        //                }
+        //            }
+        //            double a = numcrmag / dencrmag;
+
+        //            if (k == 1)
+        //            {
+        //                log.Info("Vector "+(j+k).ToString()+" is a nearest neighbor.");
+        //                //we expect a to be one and P2 to be equal to the resulting coord
+        //                //for the first nearest neighbor
+        //                if (a == 1.0)
+        //                {
+        //                    log.Info("PASS:  Nearest neighbor "+(j+k).ToString()+" is intersected at its startpoint by vector "+j.ToString()+".");
+        //                    log.Debug(j.ToString() + ":" + (j+k).ToString() + ";" + "NNY" + ";" + "PASS");
+                            
+        //                    Vector.MemorySafe_CartCoord rescoord = SumPointAndLine(P1, L1);
+        //                    if (rescoord.X == P2.X && rescoord.Y == P2.Y && rescoord.Z == P2.Z)
+        //                    {
+        //                        //and b == 0.  This truth statement is the equivalent
+        //                        IntTruth.Add(true);
+        //                        continue;
+        //                    }
+        //                }
+        //                else
+        //                {
+        //                    log.Info("FAIL:  Nearest neighbor "+(j+k).ToString()+" is not intersected at its endpoint by vector "+j.ToString()+".  This indicates an invalid enclosure.");
+        //                    log.Debug(j.ToString() + ":" + (j+k).ToString() + ";" + "NNY" + ";" + "FAIL");
+        //                    return false;
+        //                }
+        //            }
+        //            else
+        //            {
+        //                //the last vector in the set of vector 0
+        //                if (j == 0 && a == 0 && k == coordCount - 1) { log.Info("Vector " + k.ToString() + " is a nearest neighbor."); }
+        //                else { log.Info("Vector " + (j+k).ToString() + " is not a nearest neighbor."); }
+        //                //parallel lines
+        //                if (a == double.PositiveInfinity || a == double.NegativeInfinity)
+        //                {
+        //                    log.Info("PASS:  Vectors "+j.ToString()+ " and " + (j+k).ToString()+" are parallel vectors.");
+        //                    log.Debug(j.ToString() + ":" + (j+k).ToString() + ";" + "NNN" + ";" + "PASS");
+        //                    IntTruth.Add(true);
+        //                }
+        //                //ok when j==0, but not otherwise
+        //                else if (j==0 && a == 0 && k == coordCount - 1)
+        //                {
+        //                    //This may take the place of the test at the last vector in the list
+        //                    //I believe this only happens when the line intersects at the starting point
+        //                    //we may not need 
+        //                    log.Info("The vector " + (j+k).ToString() + " intersects vector " + (j).ToString() + " at its starting point.");
+        //                    log.Debug(j.ToString() + ":" + (j+k).ToString() + ";" + "NNY" + ";" + "PASS");
+        //                    return true;
+        //                }
+        //                else if (j != 0 && a == 0)
+        //                {
+        //                    //means vectors are perpendicular to each other
+        //                    //this needs to be updated, to be similar to a<1.0
+        //                    log.Error("The vector " + (j + k).ToString() + " intersects vector " + j.ToString() + " at its starting point.");
+        //                    log.Debug(j.ToString() + ":" + (j+k).ToString() + ";" + "NNN" + ";" + "FAIL");
+        //                    return false;
+        //                }
+        //                //ok
+        //                else if (a > 1.0)
+        //                {
+        //                    //this means the points intersect, but some point beyond the length of the vector
+        //                    log.Info("Pass.  Vectors would intersect but beyond the bounds of the vectors.");
+        //                    log.Debug(j.ToString() + ":" + (j+k).ToString() + ";" + "NNN" + ";" + "PASS");
+        //                    IntTruth.Add(true);
+        //                }
+        //                //bad
+        //                else if (a < 1.0)
+        //                {
+        //                    //this means they may intersect, I need to check the magnitude of the proposed intersection
+        //                    //maybe, solve for a and b and report
+        //                    log.Debug("a is equal to " + a);
+        //                    if (a == 0) log.Debug("Vector "+j+" and "+k+"are perpendicular.");
+
+        //                    Vector.MemorySafe_CartVect F1 = VectorTimesScalar(L1, a);
+        //                    Vector.MemorySafe_CartCoord rescoord = SumPointAndLine(P1, F1);
+        //                    Vector.MemorySafe_CartVect newvect = CreateMemorySafe_Vector(P2, rescoord);
+        //                    //Dec 28, 2013
+        //                    //this new vector may not face in the direction of L2.  Since we just draw a line from P2 to the new resulting coordinate.
+        //                    //if the new vector is not parallel to L2, this is another indication, similar to case 2.
+        //                    Vector.MemorySafe_CartVect L2unitvec = Vector.UnitVector(L2);
+        //                    Vector.MemorySafe_CartVect newunitvec = Vector.UnitVector(newvect);
+        //                    double diffx = Math.Abs(L2unitvec.X - newunitvec.X);
+        //                    double diffy = Math.Abs(L2unitvec.Y - newunitvec.Y);
+        //                    double diffz = Math.Abs(L2unitvec.Z - newunitvec.Z);
+
+        //                    if (diffx <= 0.01 || diffy <= 0.01 && diffz <= 0.01)
+        //                    {
+        //                        double newvectmag = Vector.VectorMagnitude(newvect);
+        //                        double L2mag = Vector.VectorMagnitude(L2);
+        //                        if (newvectmag <= L2mag)
+        //                        {
+        //                            //this clearly means that the vectors intersect
+        //                            log.Info("An illegal intersection in the polygon has been detected.");
+        //                            log.Debug(j.ToString() + ":" + (j + k).ToString() + ";" + "NNN" + ";" + "FAIL");
+        //                            return false;
+        //                        }
+        //                        else
+        //                        {
+        //                            log.Info("PASS:  Vectors could intersect but beyond the bounds of the vectors.");
+        //                            log.Debug(j.ToString() + ":" + (j + k).ToString() + ";" + "NNN" + ";" + "PASS");
+        //                            IntTruth.Add(true);
+        //                        }
+        //                    }
+        //                    //Dec 28 2013
+        //                    //If we arrive here, this essentially means that the vectors don't cross
+        //                    else
+        //                    {
+        //                        log.Info("PASS:  Vectors could intersect but beyond the bounds of the vectors.");
+        //                        log.Debug(j.ToString() + ":" + (j + k).ToString() + ";" + "NNN" + ";" + "FAIL");
+        //                        IntTruth.Add(true);
+        //                    }
+                            
+        //                }
+        //            }
+        //        }
+        //    }
+        //    catch (Exception e)
+        //    {
+        //        log.Debug(e.ToString());
+        //    }
+
+        //    if (IntTruth.Contains(false))
+        //    {
+        //        return false;
+        //    }
+        //    else
+        //    {
+        //        return true;
+        //    }
+        //}
+
+
+        //what is the point of this method
+        //It takes the ring of coordinates, and does a branch tree test to ensure that only nearest neighbors intersect.  It exhaustively searches the entire chain
         private static bool CheckAdjacencyIntersections(Dictionary<Vector.MemorySafe_CartCoord, Vector.MemorySafe_CartVect> pointvec, List<Vector.MemorySafe_CartCoord> coords, int j)
         {
             List<bool> IntTruth = new List<bool>();
 
             try
             {
-                
+
                 int coordCount = pointvec.Count();
                 log.Debug("Check Adjacency Intersections for vector " + j.ToString());
 
                 for (int k = 1; k < coordCount - j; k++)
                 {
                     Vector.MemorySafe_CartVect L1 = pointvec[coords[j]];
-                    Vector.MemorySafe_CartCoord P1 = coords[j];
+                    Vector.MemorySafe_CartCoord P11 = coords[j];
+                    Vector.MemorySafe_CartCoord P12 = SumPointAndLine(P11, L1);
 
-                    //log.Debug("Testing adjacent vector " + k.ToString());
                     Vector.MemorySafe_CartVect L2 = pointvec[coords[j + k]];
-                    Vector.MemorySafe_CartCoord P2 = coords[j + k];
+                    Vector.MemorySafe_CartCoord P21 = coords[j + k];
+                    Vector.MemorySafe_CartCoord P22 = SumPointAndLine(P21,L2);
 
-                    Vector.MemorySafe_CartVect tempvec = CreateMemorySafe_Vector(P1, P2);
-                    Vector.MemorySafe_CartVect numcross = CrossProduct(tempvec, L2);
-                    double numcrmag = VectorMagnitude(numcross);
-                    Vector.MemorySafe_CartVect dencross = CrossProduct(L1, L2);
-                    double dencrmag = VectorMagnitude(dencross);
-                    //basic checks suggested:  are numcross and dencross parallel?
-                    //is numcross not the zero vector?
-                    if (numcrmag == 0 && dencrmag == 0)
+                    double[] arr1 = new double[3];
+                    double A1 = P11.Y - P12.Y;
+                    double B1 = P12.X - P11.X;
+                    double C1 = A1 * P11.X + B1 * P11.Y;
+                    arr1[0] = A1;
+                    arr1[1] = B1;
+                    arr1[2] = C1;
+
+                    double[] arr2 = new double[3];
+                    double A2 = P21.Y - P22.Y;
+                    double B2 = P22.X - P21.X;
+                    double C2 = A2 * P21.X + B2 * P21.Y;
+                    arr2[0] = A2;
+                    arr2[1] = B2;
+                    arr2[2] = C2;
+
+                    double[][] comparr = new double[2][];
+                    comparr[0] = arr1;
+                    comparr[1] = arr2;
+                    comparr = ReducedRowEchelonForm(comparr);
+                    double xmin1 = Math.Min(P11.X, P12.X);
+                    double xmax1 = Math.Max(P11.X, P12.X);
+                    double xmin2 = Math.Min(P21.X, P22.X);
+                    double xmax2 = Math.Max(P21.X, P22.X);
+                    double ymin1 = Math.Min(P11.Y, P12.Y);
+                    double ymax1 = Math.Max(P11.Y, P12.Y);
+                    double ymin2 = Math.Min(P21.Y, P22.Y);
+                    double ymax2 = Math.Max(P21.Y, P22.Y);
+                    //if it reduces to reduced row echelon form, then extract the x and y coordinates
+                    if (comparr[0][0] == 1 && comparr[0][1] == 0 && comparr[1][0] == 0 && comparr[1][1] == 1)
                     {
-                        //the two lines are clearly parallel
-                        //not sure if this check is needed, but we ensure that these two parallel lines are unique and do not overlap
-                        //it gets a bit more complicated from here
-
-                    }
-                    double a = numcrmag / dencrmag;
-
-                    if (k == 1)
-                    {
-                        log.Info("Vector "+(j+k).ToString()+" is a nearest neighbor.");
-                        //we expect a to be one and P2 to be equal to the resulting coord
-                        //for the first nearest neighbor
-                        if (a == 1.0)
+                        if (k == 1)
                         {
-                            log.Info("PASS:  Nearest neighbor "+(j+k).ToString()+" is intersected at its startpoint by vector "+j.ToString()+".");
-                            log.Debug(j.ToString() + ":" + (j+k).ToString() + ";" + "NNY" + ";" + "PASS");
-                            
-                            Vector.MemorySafe_CartCoord rescoord = SumPointAndLine(P1, L1);
-                            if (rescoord.X == P2.X && rescoord.Y == P2.Y && rescoord.Z == P2.Z)
-                            {
-                                //and b == 0.  This truth statement is the equivalent
-                                IntTruth.Add(true);
-                                continue;
-                            }
+                            //this is supposed to happen this is good, since it is a nearest neighbor
+                            log.Info("Vector " + (j + k).ToString() + " is a nearest neighbor.");
+                            log.Debug(j.ToString() + ":" + (j + k).ToString() + ";" + "NNY" + ";" + "PASS");
+                            IntTruth.Add(true);
+                            continue;
+                        }
+                        else if (j == 0 && k == coordCount - 1)
+                        {
+                            //this is also supposed to happen for since this is a nearest neighbor check.
+                            log.Info("Vector " + (j + k).ToString() + " is a nearest neighbor.");
+                            log.Debug(j.ToString() + ":" + (j + k).ToString() + ";" + "NNY" + ";" + "PASS");
+                            IntTruth.Add(true);
+                            continue;
                         }
                         else
                         {
-                            log.Info("FAIL:  Nearest neighbor "+(j+k).ToString()+" is not intersected at its endpoint by vector "+j.ToString()+".  This indicates an invalid enclosure.");
-                            log.Debug(j.ToString() + ":" + (j+k).ToString() + ";" + "NNY" + ";" + "FAIL");
-                            return false;
-                        }
-                    }
-                    else
-                    {
-                        //the last vector in the set of vector 0
-                        if (j == 0 && a == 0 && k == coordCount - 1) { log.Info("Vector " + k.ToString() + " is a nearest neighbor."); }
-                        else { log.Info("Vector " + (j+k).ToString() + " is not a nearest neighbor."); }
-                        //parallel lines
-                        if (a == double.PositiveInfinity || a == double.NegativeInfinity)
-                        {
-                            log.Info("PASS:  Vectors "+j.ToString()+ " and " + (j+k).ToString()+" are parallel vectors.");
-                            log.Debug(j.ToString() + ":" + (j+k).ToString() + ";" + "NNN" + ";" + "PASS");
-                            IntTruth.Add(true);
-                        }
-                        //ok when j==0, but not otherwise
-                        else if (j==0 && a == 0 && k == coordCount - 1)
-                        {
-                            //This may take the place of the test at the last vector in the list
-                            //I believe this only happens when the line intersects at the starting point
-                            //we may not need 
-                            log.Info("The vector " + (j+k).ToString() + " intersects vector " + (j).ToString() + " at its starting point.");
-                            log.Debug(j.ToString() + ":" + (j+k).ToString() + ";" + "NNY" + ";" + "PASS");
-                            return true;
-                        }
-                        else if (j != 0 && a == 0)
-                        {
-                            log.Error("The vector " + (j + k).ToString() + " intersects vector " + j.ToString() + " at its starting point.");
-                            log.Debug(j.ToString() + ":" + (j+k).ToString() + ";" + "NNN" + ";" + "FAIL");
-                            return false;
-                        }
-                        //ok
-                        else if (a > 1.0)
-                        {
-                            //this means the points intersect, but some point beyond the length of the vector
-                            log.Info("Pass.  Vectors would intersect but beyond the bounds of the vectors.");
-                            log.Debug(j.ToString() + ":" + (j+k).ToString() + ";" + "NNN" + ";" + "PASS");
-                            IntTruth.Add(true);
-                        }
-                        //bad
-                        else if (a < 1.0)
-                        {
-                            //this means they may intersect, I need to check the magnitude of the proposed intersection
-                            //maybe, solve for a and b and report
-                            log.Debug("a is less than 1.");
-
-                            
-                            Vector.MemorySafe_CartVect F1 = VectorTimesScalar(L1, a);
-                            Vector.MemorySafe_CartCoord rescoord = SumPointAndLine(P1, F1);
-                            Vector.MemorySafe_CartVect newvect = CreateMemorySafe_Vector(P2, rescoord);
-                            //Dec 28, 2013
-                            //this new vector may not face in the direction of L2.  Since we just draw a line from P2 to the new resulting coordinate.
-                            //if the new vector is not parallel to L2, this is another indication, similar to case 2.
-                            Vector.MemorySafe_CartVect L2unitvec = Vector.UnitVector(L2);
-                            Vector.MemorySafe_CartVect newunitvec = Vector.UnitVector(newvect);
-                            double diffx = Math.Abs(L2unitvec.X - newunitvec.X);
-                            double diffy = Math.Abs(L2unitvec.Y - newunitvec.Y);
-                            double diffz = Math.Abs(L2unitvec.Z - newunitvec.Z);
-
-                            if (diffx <= 0.01 || diffy <= 0.01 && diffz <= 0.01)
+                            //being interested only in the line that we currently are checking...
+                            double slope = (P12.Y - P11.Y) / (P12.X - P11.X);
+                            if (slope == 0)
                             {
-                                double newvectmag = Vector.VectorMagnitude(newvect);
-                                double L2mag = Vector.VectorMagnitude(L2);
-                                if (newvectmag <= L2mag)
+                                log.Debug("Vector " + j + " is horizontal.");
+                                if (isInBounds(comparr[0][2], xmin1, xmin2, xmax1, xmax2) && isInBounds(comparr[1][2], ymin1, ymin2, ymax1, ymax2))
                                 {
-                                    //this clearly means that the vectors intersect
-                                    log.Info("An illegal intersection in the polygon has been detected.");
+                                    log.Info("FAIL:  Illegal intersection");
                                     log.Debug(j.ToString() + ":" + (j + k).ToString() + ";" + "NNN" + ";" + "FAIL");
                                     return false;
                                 }
                                 else
                                 {
-                                    log.Info("PASS:  Vectors could intersect but beyond the bounds of the vectors.");
                                     log.Debug(j.ToString() + ":" + (j + k).ToString() + ";" + "NNN" + ";" + "PASS");
-                                    IntTruth.Add(true);
+                                    continue;
                                 }
                             }
-                            //Dec 28 2013
-                            //If we arrive here, this essentially means that the vectors don't cross
+                            else if (slope == double.PositiveInfinity || slope == double.NegativeInfinity)
+                            {
+                                if (isInBounds(comparr[0][2], xmin1, xmin2, xmax1, xmax2) && isInBounds(comparr[1][2], ymin1, ymin2, ymax1, ymax2))
+                                {
+                                    log.Info("FAIL: Illegal intersection");
+                                    log.Debug(j.ToString() + ":" + (j + k).ToString() + ";" + "NNN" + ";" + "FAIL");
+                                    return false;
+                                }
+                                else
+                                {
+                                    log.Debug(j.ToString() + ":" + (j + k).ToString() + ";" + "NNN" + ";" + "PASS");
+                                    continue;
+                                }
+                            }
                             else
                             {
-                                log.Info("PASS:  Vectors could intersect but beyond the bounds of the vectors.");
-                                log.Debug(j.ToString() + ":" + (j + k).ToString() + ";" + "NNN" + ";" + "FAIL");
-                                IntTruth.Add(true);
+                                if (!isInBounds(comparr[0][2], xmin1, xmin2, xmax1, xmax2) && !isInBounds(comparr[1][2], ymin1, ymin2, ymax1, ymax2))
+                                {
+                                    //this is good
+                                    log.Debug(j.ToString() + ":" + (j + k).ToString() + ";" + "NNN" + ";" + "PASS");
+                                    continue;
+                                }
+                                else
+                                {
+                                    log.Info("FAIL:  Illegal intersection");
+                                    log.Debug(j.ToString() + ":" + (j + k).ToString() + ";" + "NNN" + ";" + "FALSE");
+                                    return false;
+                                }
                             }
-                            
+                            //this should not happen and we need to return false
+                        }
+                    }
+                    else
+                    {
+                        if (k == 1)
+                        {
+                            //this should never happen, it is bad, since it is a nearest neighbor
+                            log.Info("Vector " + (j + k).ToString() + " is a nearest neighbor.");
+                            log.Info("FAIL: Not enclosed.");
+                            log.Debug(j.ToString() + ":" + (j + k).ToString() + ";" + "NNY" + ";" + "FAIL");
+                            return false;
+                        }
+                        else if (j == 0 && k == coordCount - 1)
+                        {
+                            log.Info("Vector " + (j + k).ToString() + " is a nearest neighbor.");
+                            log.Info("FAIL: Not enclosed.");
+                            log.Debug(j.ToString() + ":" + (j + k).ToString() + ";" + "NNY" + ";" + "FAIL");
+                            return false;
+                        }
+                        else
+                        {
+                            //this is good
+                            log.Debug(j.ToString() + ":" + (j + k).ToString() + ";" + "NNN" + ";" + "TRUE");
+                            IntTruth.Add(true);
+                            continue;
                         }
                     }
                 }
@@ -624,18 +1233,109 @@ namespace VectorMath
             }
         }
 
-        public static CartCoord GetCentroid(List<CartCoord> coordinates)
+        private static bool isInBounds(double coord, double min1, double min2, double max1, double max2)
         {
-            //based on a formula for a centroid of a planar surface defined with three coordinates
-            //Cx = (1/6A)*sig(i=0->N-1) (x(i)+x(i+1))(x(i)y(i+1)-x(i+1)y(i))
-            //Cy = (1/6A)*sig(i=0->N-1) (y(i)+y(i+1))(x(i)y(i+1)-x(i+1)y(i))
-            //Cz = (1/6A)*sig(i=0->N-1) (z(i)+z(i+1))(x(i)z(i+1)-x(i+1)z(i))
-            //we recognize this may not be entirely accurate but should be for the types of surfaces we are going to deal with we assume the centroid will fall somewhere inside the coordinates)
+            if (coord >= min1 && coord >= min2 && coord <= max1 && coord <= max2)
+            {
+                return true;
+            }
+            else
+            {
+                return false;
+            }
+        }
 
-            CartCoord centroid = new CartCoord();
-            //calculate the area of the polyLoop
+        public static double[][] ReducedRowEchelonForm(double[][] comparr)
+        {
+            
+            int lead = 0;
+            int rowcount = comparr.Length;
+            int columncount = comparr[0].Length;
 
-            return centroid;
+            for (int r = 0; r < rowcount; r++)
+            {
+                //reached the end
+                if (columncount <= lead) break;
+                int i = r;
+                //checks to see if two rows should be switched
+                while (comparr[i][lead] == 0)
+                {
+                    i++;
+                    if (i == rowcount)
+                    {
+                        i = r;
+                        lead++;
+                        if (columncount == lead)
+                        {
+                            //reached the end
+                            lead--;
+                            break;
+                        }
+                    }
+                }
+                //switches the rows if needed
+                for (int j = 0; j < columncount; j++)
+                {
+                    double temp = comparr[r][j];
+                    comparr[r][j] = comparr[i][j];
+                    comparr[i][j] = temp;
+
+                }
+                //do the math to reduce to echelon form
+                double div = comparr[r][lead];
+                for (int j = 0; j < columncount; j++)
+                {
+                    comparr[r][j] /= div;
+                }
+                for (int j = 0; j < rowcount; j++)
+                {
+                    if (j != r)
+                    {
+                        double sub = comparr[j][lead];
+                        for (int k = 0; k < columncount; k++)
+                        {
+                            comparr[j][k] -= sub * comparr[r][k];
+                        }
+                    }
+                }
+                lead++;
+            }
+
+            return comparr;
+        }
+        public static MemorySafe_CartCoord GetCentroid(List<MemorySafe_CartCoord> coordinates, bool isRegular)
+        {
+
+            try
+            {
+                CartCoord centroid = new CartCoord();
+                centroid.X = 0;
+                centroid.Y = 0;
+                centroid.Z = 0;
+                
+                if (isRegular)
+                {
+                    //calculate the area of the polyLoop
+                    //from Wikipedia
+                    double area = GetAreaFrom2DPolyLoop(coordinates);
+                    for (int i = 0; i < coordinates.Count - 1; i++)
+                    {
+                        centroid.X += (coordinates[i].X + coordinates[i + 1].X) * (coordinates[i].X * coordinates[i + 1].Y - coordinates[i + 1].X * coordinates[i].Y);
+                        centroid.Y += (coordinates[i].Y + coordinates[i + 1].Y) * (coordinates[i].X * coordinates[i + 1].Y - coordinates[i + 1].X * coordinates[i].Y);
+                    }
+                    centroid.X /= 6 * area;
+                    centroid.Y /= 6 * area;
+                    MemorySafe_CartCoord memC = new MemorySafe_CartCoord(centroid.X, centroid.Y, centroid.Z);
+                    return memC;
+                }
+            }
+            catch (Exception e)
+            {
+                log.Debug("Fail:" + e.ToString());
+            }
+            MemorySafe_CartCoord memF = new MemorySafe_CartCoord(-1000, -1000, -1000);
+            return memF;
+            
         }
 
         //February 20 2013
@@ -891,6 +1591,249 @@ namespace VectorMath
             
         }
 
+        //CHarriman Feb 14 2014 <3<3<3
+        //a revision of the get area of a surface.  Used in the Rhino Grasshopper library
+        public static double GetAreaofMemSafeCoords(List<Vector.MemorySafe_CartCoord> coords)
+        {
+            //Used to figure out how best to calculate the area from a given surfacce. 
+            //Get the coordinates that define the surface
+            //get the area based on the coordinates
+
+            //Get the RHRVector (the actual direction is not important
+            MemorySafe_CartVect RHRVector = GetMemRHR(coords);
+
+            //now that I have this, I can move on
+
+            //there are two basic cases for calculating the area that we cover here, 
+            //one where we get the area using greens theorem when the surface is parallel to one of the axes of the project global reference frame
+            //and the second where the surface is not parallel to one of the axes of the global reference frame
+
+            //Surface normal Parallel to global reference frame X Axis
+            if (Math.Abs(RHRVector.X) == 1 && RHRVector.Y == 0 && RHRVector.Z == 0)
+            {
+                List<CartCoord> coordList = new List<CartCoord>();
+                foreach (MemorySafe_CartCoord coord in coords)
+                {
+                    //only take the Y and Z coordinates and throw out the X because we can assume that they are all the same
+                    CartCoord tempcoord = new CartCoord();
+                    tempcoord.X = 0;
+                    tempcoord.Y = coord.Y;
+                    tempcoord.Z = coord.Z;
+                    coordList.Add(tempcoord);
+
+                }
+                double area = GetAreaFrom2DPolyLoop(coordList);
+                return area;
+
+
+            }
+            //Surface normal Parallel to global reference frame y Axis
+            else if (RHRVector.X == 0 && Math.Abs(RHRVector.Y) == 1 && RHRVector.Z == 0)
+            {
+                List<Vector.CartCoord> coordList = new List<Vector.CartCoord>();
+                foreach (MemorySafe_CartCoord coord in coords)
+                {
+                    //only take the X and Z coordinates and throw out the Y because we can assume that they are all the same
+                    CartCoord tempcoord = new CartCoord();
+                    tempcoord.X = coord.X;
+                    tempcoord.Y = 0;
+                    tempcoord.Z = coord.Z;
+                    coordList.Add(tempcoord);
+
+                }
+                double area = GetAreaFrom2DPolyLoop(coordList);
+                return area;
+            }
+            else if (RHRVector.X == 0 && RHRVector.Y == 0 && Math.Abs(RHRVector.Z) == 1)
+            {
+                List<Vector.CartCoord> coordList = new List<Vector.CartCoord>();
+                foreach (MemorySafe_CartCoord coord in coords)
+                {
+                    //only take the X and Y coordinates and throw out the Z because we can assume that they are all the same
+                    CartCoord tempcoord = new CartCoord();
+                    tempcoord.X = coord.X;
+                    tempcoord.Y = coord.Y;
+                    tempcoord.Z = 0;
+                    coordList.Add(tempcoord);
+
+                }
+                double area = GetAreaFrom2DPolyLoop(coordList);
+                return area;
+            }
+
+            //the surface is not aligned with one of the reference frame axes, which requires a bit more work to determine the right answer.
+            else
+            {
+
+                //New Z Axis for this plane is the normal vector already calculated, does not need to be created
+                //Get New Y Axis which is the surface Normal Vector cross the original global reference X unit vector (all unit vectors please
+
+                CartVect globalReferenceX = new CartVect();
+                globalReferenceX.X = 1;
+                globalReferenceX.Y = 0;
+                globalReferenceX.Z = 0;
+
+                CartVect localY = CrossProductNVRetMSNV(RHRVector, globalReferenceX);
+                localY = UnitVector(localY);
+
+                
+                //new X axis is the localY cross the surface normal vector
+                Vector.CartVect localX = new Vector.CartVect();
+
+                localX = CrossProductNVRetNVMS(localY, RHRVector);
+                localX = Vector.UnitVector(localX);
+
+                //convert the polyloop coordinates to a local 2-D reference frame
+                //using a trick employed by video game programmers found here http://stackoverflow.com/questions/1023948/rotate-normal-vector-onto-axis-plane
+                List<Vector.CartCoord> translatedCoordinates = new List<Vector.CartCoord>();
+                //put the origin in place in these translated coordinates since our loop skips over this first arbitrary point
+                Vector.CartCoord newOrigin = new Vector.CartCoord();
+                newOrigin.X = 0;
+                newOrigin.Y = 0;
+                newOrigin.Z = 0;
+                translatedCoordinates.Add(newOrigin);
+                for (int j = 1; j < coords.Count; j++)
+                {
+                    //randomly assigns the first polyLoop coordinate as the origin
+                    Vector.CartCoord origin = new CartCoord();
+                    origin.X = coords[0].X;
+                    origin.Y = coords[0].Y;
+                    origin.Z = coords[0].Z;
+                    //captures the components of a vector drawn from the new origin to the 
+                    Vector.CartVect distance = new Vector.CartVect();
+                    
+                    distance.X = coords[j].X - origin.X;
+                    distance.Y = coords[j].Y - origin.Y;
+                    distance.Z = coords[j].Z - origin.Z;
+                    Vector.CartCoord translatedPt = new Vector.CartCoord();
+                    //x coordinate is distance vector dot the new local X axis
+                    translatedPt.X = distance.X * localX.X + distance.Y * localX.Y + distance.Z * localX.Z;
+                    //y coordinate is distance vector dot the new local Y axis
+                    translatedPt.Y = distance.X * localY.X + distance.Y * localY.Y + distance.Z * localY.Z;
+                    translatedPt.Z = 0;
+                    translatedCoordinates.Add(translatedPt);
+
+                }
+                double area = GetAreaFrom2DPolyLoop(translatedCoordinates);
+                return area;
+            }
+
+        }
+
+        //public static double GetAreaofPolyList(List<Vector.MemorySafe_CartCoord> coordlist)
+        //{
+        //    //Used to figure out how best to calculate the area from a given surfacce. 
+        //    //Get the coordinates that define the surface
+        //    //get the area based on the coordinates
+
+        //    //Get the RHRVector (the actual direction is not important
+        //    MemorySafe_CartVect RHRVector = GetMemRHR(coordlist);
+
+        //    //now that I have this, I can move on
+
+        //    //there are two basic cases for calculating the area that we cover here, 
+        //    //one where we get the area using greens theorem when the surface is parallel to one of the axes of the project global reference frame
+        //    //and the second where the surface is not parallel to one of the axes of the global reference frame
+
+        //    //Surface normal Parallel to global reference frame X Axis
+        //    if (Math.Abs(RHRVector.X) == 1 && RHRVector.Y == 0 && RHRVector.Z == 0)
+        //    {
+        //        List<Vector.CartCoord> coordList = new List<Vector.CartCoord>();
+        //        foreach (Vector.CartCoord coord in coordList)
+        //        {
+        //            //only take the Y and Z coordinates and throw out the X because we can assume that they are all the same
+        //            coord.X = 0;
+        //            double Y = surface.SurfaceCoords[i].Y;
+        //            double Z = surface.SurfaceCoords[i].Z;
+        //            Vector.MemorySafe_CartCoord coord = new MemorySafe_CartCoord(X, Y, Z);
+        //            coordList.Add(coord);
+
+        //        }
+        //        double area = GetAreaFrom2DPolyLoop(coordList);
+        //        return area;
+
+
+        //    }
+        //    //Surface normal Parallel to global reference frame y Axis
+        //    else if (RHRVector.X == 0 && Math.Abs(RHRVector.Y) == 1 && RHRVector.Z == 0)
+        //    {
+        //        List<Vector.CartCoord> coordList = new List<Vector.CartCoord>();
+        //        foreach (Vector.CartCoord coord in surface.SurfaceCoords)
+        //        {
+        //            //only take the X and Z coordinates and throw out the Y because we can assume that they are all the same
+        //            coord.Y = 0;
+        //            coordList.Add(coord);
+
+        //        }
+        //        double area = GetAreaFrom2DPolyLoop(coordList);
+        //        return area;
+        //    }
+        //    else if (RHRVector.X == 0 && RHRVector.Y == 0 && Math.Abs(RHRVector.Z) == 1)
+        //    {
+        //        List<Vector.CartCoord> coordList = new List<Vector.CartCoord>();
+        //        foreach (Vector.CartCoord coord in surface.SurfaceCoords)
+        //        {
+        //            //only take the X and Y coordinates and throw out the Z because we can assume that they are all the same
+        //            coord.Z = 0;
+        //            coordList.Add(coord);
+
+        //        }
+        //        double area = GetAreaFrom2DPolyLoop(coordList);
+        //        return area;
+        //    }
+
+        //    //the surface is not aligned with one of the reference frame axes, which requires a bit more work to determine the right answer.
+        //    else
+        //    {
+
+        //        //New Z Axis for this plane is the normal vector already calculated, does not need to be created
+        //        //Get New Y Axis which is the surface Normal Vector cross the original global reference X unit vector (all unit vectors please
+        //        Vector.CartVect localY = new Vector.CartVect();
+        //        Vector.CartVect globalReferenceX = new Vector.CartVect();
+        //        globalReferenceX.X = 1;
+        //        globalReferenceX.Y = 0;
+        //        globalReferenceX.Z = 0;
+        //        localY = Vector.CrossProduct(RHRVector, globalReferenceX);
+        //        localY = Vector.UnitVector(localY);
+
+        //        //new X axis is the localY cross the surface normal vector
+        //        Vector.CartVect localX = new Vector.CartVect();
+        //        localX = Vector.CrossProduct(localY, RHRVector);
+        //        localX = Vector.UnitVector(localX);
+
+        //        //convert the polyloop coordinates to a local 2-D reference frame
+        //        //using a trick employed by video game programmers found here http://stackoverflow.com/questions/1023948/rotate-normal-vector-onto-axis-plane
+        //        List<Vector.CartCoord> translatedCoordinates = new List<Vector.CartCoord>();
+        //        //put the origin in place in these translated coordinates since our loop skips over this first arbitrary point
+        //        Vector.CartCoord newOrigin = new Vector.CartCoord();
+        //        newOrigin.X = 0;
+        //        newOrigin.Y = 0;
+        //        newOrigin.Z = 0;
+        //        translatedCoordinates.Add(newOrigin);
+        //        for (int j = 1; j < surface.SurfaceCoords.Count; j++)
+        //        {
+        //            //randomly assigns the first polyLoop coordinate as the origin
+        //            Vector.CartCoord origin = surface.SurfaceCoords[0];
+        //            //captures the components of a vector drawn from the new origin to the 
+        //            Vector.CartVect distance = new Vector.CartVect();
+        //            distance.X = surface.SurfaceCoords[j].X - origin.X;
+        //            distance.Y = surface.SurfaceCoords[j].Y - origin.Y;
+        //            distance.Z = surface.SurfaceCoords[j].Z - origin.Z;
+        //            Vector.CartCoord translatedPt = new Vector.CartCoord();
+        //            //x coordinate is distance vector dot the new local X axis
+        //            translatedPt.X = distance.X * localX.X + distance.Y * localX.Y + distance.Z * localX.Z;
+        //            //y coordinate is distance vector dot the new local Y axis
+        //            translatedPt.Y = distance.X * localY.X + distance.Y * localY.Y + distance.Z * localY.Z;
+        //            translatedPt.Z = 0;
+        //            translatedCoordinates.Add(translatedPt);
+
+        //        }
+        //        double area = GetAreaFrom2DPolyLoop(translatedCoordinates);
+        //        return area;
+        //    }
+
+        //}
+
         public static double GetAreaofSurface(ModelingUtilities.BuildingObjects.MemorySafe_Surface surface)
         {
             //Used to figure out how best to calculate the area from a given surfacce. 
@@ -898,7 +1841,7 @@ namespace VectorMath
             //get the area based on the coordinates
 
             //Get the RHRVector (the actual direction is not important
-            MemorySafe_CartVect RHRVector = GetRHR(surface.SurfaceCoords);
+            MemorySafe_CartVect RHRVector = GetMemRHR(surface.SurfaceCoords);
 
             //now that I have this, I can move on
 
@@ -1007,6 +1950,51 @@ namespace VectorMath
 
         }
 
+        public static List<Vector.MemorySafe_CartCoord> flattenPolyLoop(List<Vector.MemorySafe_CartCoord> coordlist)
+        {
+
+            MemorySafe_CartVect RHRVector = GetMemRHR(coordlist);
+            //New Z Axis for this plane is the normal vector already calculated, does not need to be created
+                //Get New Y Axis which is the surface Normal Vector cross the original global reference X unit vector (all unit vectors please
+                double X = 1;
+                double Y = 0;
+                double Z = 0;
+                Vector.MemorySafe_CartVect globalReferenceX = new Vector.MemorySafe_CartVect(X,Y,Z);
+
+                Vector.MemorySafe_CartVect localY = Vector.CrossProduct(RHRVector, globalReferenceX);
+                localY = Vector.UnitVector(localY);
+
+                //new X axis is the localY cross the surface normal vector
+                Vector.MemorySafe_CartVect localX = Vector.CrossProduct(localY, RHRVector);
+                localX = Vector.UnitVector(localX);
+
+                //convert the polyloop coordinates to a local 2-D reference frame
+                //using a trick employed by video game programmers found here http://stackoverflow.com/questions/1023948/rotate-normal-vector-onto-axis-plane
+                List<Vector.MemorySafe_CartCoord> translatedCoordinates = new List<Vector.MemorySafe_CartCoord>();
+                //put the origin in place in these translated coordinates since our loop skips over this first arbitrary point
+                double originX = 0;
+                double originY = 0;
+                double originZ = 0;
+                Vector.MemorySafe_CartCoord newOrigin = new Vector.MemorySafe_CartCoord(originX, originY, originZ);
+                translatedCoordinates.Add(newOrigin);
+                for (int j = 1; j < coordlist.Count; j++)
+                {
+                    //randomly assigns the first polyLoop coordinate as the origin
+                    Vector.MemorySafe_CartCoord origin = coordlist[0];
+                    //captures the components of a vector drawn from the new origin to the 
+                    double xDistance = coordlist[j].X - origin.X;
+                    double yDist = coordlist[j].Y - origin.Y;
+                    double zDist = coordlist[j].Z - origin.Z;
+                    Vector.MemorySafe_CartVect distance = new Vector.MemorySafe_CartVect(xDistance, yDist, zDist);
+                    double translPtX = distance.X * localX.X + distance.Y * localX.Y + distance.Z * localX.Z;
+                    double translPtY = distance.X * localY.X + distance.Y * localY.Y + distance.Z * localY.Z;
+                    double translPtZ = 0;
+                    Vector.MemorySafe_CartCoord translatedPt = new Vector.MemorySafe_CartCoord(translPtX, translPtY, translPtZ);
+                    translatedCoordinates.Add(translatedPt);
+                }
+                return translatedCoordinates;
+        }
+
         public static double GetAreaofWindow(ModelingUtilities.BuildingObjects.MemorySafe_OpeningDefinitions opening)
         {
             //Used to figure out how best to calculate the area from a given surfacce. 
@@ -1014,7 +2002,7 @@ namespace VectorMath
             //get the area based on the coordinates
 
             //Get the RHRVector (the actual direction is not important
-            MemorySafe_CartVect RHRVector = GetRHR(opening.coordinateList);
+            MemorySafe_CartVect RHRVector = GetMemRHR(opening.coordinateList);
 
             //now that I have this, I can move on
 
@@ -1180,7 +2168,7 @@ namespace VectorMath
             }
         }
 
-        public static Vector.MemorySafe_CartVect GetRHR(List<Vector.MemorySafe_CartCoord> plCoords)
+        public static Vector.MemorySafe_CartVect GetMemRHR(List<Vector.MemorySafe_CartCoord> plCoords)
         {
             Vector.CartVect plRHRVect = new Vector.CartVect();
             //this list will store all of the rhr values returned by any arbitrary polyloop
