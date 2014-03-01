@@ -235,6 +235,18 @@ namespace VectorMath
             return xProd;
         }
 
+        public static CartVect CrossProductNVRetMSMS(MemorySafe_CartVect vector1, MemorySafe_CartVect vector2)
+        {
+            double xProdX = vector2.Z * vector1.Y - vector1.Z * vector2.Y;
+            double xProdY = -1 * (vector2.Z * vector1.X - vector1.Z * vector2.X);
+            double xProdZ = vector2.Y * vector1.X - vector1.Y * vector2.X;
+            CartVect xProd = new CartVect(xProdX, xProdY, xProdZ);
+            xProd.X = xProdX;
+            xProd.Y = xProdY;
+            xProd.Z = xProdZ;
+            return xProd;
+        }
+
         public static CartVect CrossProductNVRetNVMS(CartVect vector1, MemorySafe_CartVect vector2)
         {
             double xProdX = vector2.Z * vector1.Y - vector1.Z * vector2.Y;
