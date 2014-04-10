@@ -2609,25 +2609,29 @@ namespace VectorMath
                                 Vector.MemorySafe_CartVect cross = Vector.CrossProduct(A, ev);
                                 double crossmag = Vector.VectorMagnitude(cross);
                                 //tolerance?
-                                //we know that they are parallel, and therefore that the test edge is shorter than the guest edge
+                                //in this special case, if the dot product turns out to be parallel, then the edges do not overlap
                                 if (dot > 0 && dot - 1 <= vectortol)
                                 {
-                                    //we now verify if the point resides on the edge or outside of it
-                                    double Bx = gueststartpt.X - edge.startendpt[0].X;
-                                    double By = gueststartpt.Y - edge.startendpt[0].Y;
-                                    double Bz = gueststartpt.Z - edge.startendpt[0].Z;
-                                    Vector.MemorySafe_CartVect B = new Vector.MemorySafe_CartVect(Bx, By, Bz);
-                                    double Bmag = Vector.VectorMagnitude(B);
-                                    //check to see if the test edge is inside the guest edge
-                                    if (Amag < evmag && Bmag < evmag)
-                                    {
-                                        //this means it lies on the plane at least, so it shares, but it is also still independent because a perfect match wasn't found
-                                        kp.Value.relatedEdges.Add(edge);
-                                        //accumulate its own relationships
-                                        edge.relatedEdges.Add(kp.Value);
-                                        edgeloopcounter++;
-                                        continue;
-                                    }
+                                    
+                                    edgeloopcounter++;
+                                    continue;
+                                    //deprecated as incorrect Apr 7,2014
+                                    ////we now verify if the point resides on the edge or outside of it
+                                    //double Bx = gueststartpt.X - edge.startendpt[0].X;
+                                    //double By = gueststartpt.Y - edge.startendpt[0].Y;
+                                    //double Bz = gueststartpt.Z - edge.startendpt[0].Z;
+                                    //Vector.MemorySafe_CartVect B = new Vector.MemorySafe_CartVect(Bx, By, Bz);
+                                    //double Bmag = Vector.VectorMagnitude(B);
+                                    ////check to see if the test edge is inside the guest edge
+                                    //if (Amag < evmag && Bmag < evmag)
+                                    //{
+                                    //    //this means it lies on the plane at least, so it shares, but it is also still independent because a perfect match wasn't found
+                                    //    kp.Value.relatedEdges.Add(edge);
+                                    //    //accumulate its own relationships
+                                    //    edge.relatedEdges.Add(kp.Value);
+                                    //    edgeloopcounter++;
+                                    //    continue;
+                                    //}
                                 }
                                 //we know the lines are antiparallel, meaning that the test edge is longer than the guest edge
                                 else if (dot < 0 && Math.Abs(dot) - 1 <= vectortol)
@@ -2638,16 +2642,14 @@ namespace VectorMath
                                     Vector.MemorySafe_CartVect edgevec = new Vector.MemorySafe_CartVect(testedgeX, testedgeY, testedgeZ);
                                     double testedgemag = Vector.VectorMagnitude(edgevec);
 
-                                    //we verify
-                                    if (testedgemag > evmag)
-                                    {
-                                        //this means the test edge is longer than the guest edge, but they overlap
-                                        kp.Value.relatedEdges.Add(edge);
-                                        //the edge is still unique but accumulates a neighbor
-                                        edge.relatedEdges.Add(kp.Value);
-                                        edgeloopcounter++;
-                                        continue;
-                                    }
+
+                                    //this means the test edge is longer than the guest edge, but they overlap
+                                    kp.Value.relatedEdges.Add(edge);
+                                    //the edge is still unique but accumulates a neighbor
+                                    edge.relatedEdges.Add(kp.Value);
+                                    edgeloopcounter++;
+                                    continue;
+                                    
                                     //deprecated as not productive code March 30 2014
                                     //double Cx = gueststartpt.X - edge.startendpt[0].X;
                                     //double Cy = gueststartpt.Y - edge.startendpt[0].Y;
@@ -2689,7 +2691,7 @@ namespace VectorMath
                             double evY = guestendpt.Y - gueststartpt.Y;
                             double evZ = guestendpt.Z - gueststartpt.Z;
                             Vector.MemorySafe_CartVect guestvec = new Vector.MemorySafe_CartVect(evX, evY, evZ);
-                            double guestvecmag = Vector.VectorMagnitude(guestvec);
+                            
 
                             double edgeX = edge.startendpt[1].X - edge.startendpt[0].X;
                             double edgeY = edge.startendpt[1].Y - edge.startendpt[0].Y;
@@ -2729,72 +2731,52 @@ namespace VectorMath
                                 //check to see if the test edge's first point (index 0) is totally inside the guest edge
                                 if (crossB <= vectortol)
                                 {
-                                    //we know they are now surely parallel, and that they are on top of one another, question is, do they overlap?
-                                    Vector.PointVector guestPV = new Vector.PointVector(gueststartpt, guestendpt);
-                                    Vector.PointVector test1 = new Vector.PointVector(gueststartpt, edge.startendpt[0]);
-                                    Vector.PointVector test2 = new Vector.PointVector(gueststartpt, edge.startendpt[1]);
+                                    //we know they are now surely parallel, and that they are on top of one another, question is, HOW do they overlap?
+                                    //which one is longer?
+                                    double gvm = VectorMagnitude(guestvec);
+                                    double tvm = Vector.VectorMagnitude(testedgev);
+                                    double Cx = guestendpt.X - edge.startendpt[0].X;
+                                    double Cy = guestendpt.Y - edge.startendpt[0].Y;
+                                    double Cz = guestendpt.Z - edge.startendpt[0].Z;
+                                    Vector.MemorySafe_CartVect C = new MemorySafe_CartVect(Cx, Cy, Cz);
 
-                                    bool test1inside = false;
-                                    bool test2inside = false;
-                                    //tolerance?
-                                    if (Vector.DotProductMag(guestPV.v, test1.v) - 1 <= vectortol)
+                                    double Dx = guestendpt.X - edge.startendpt[1].X;
+                                    double Dy = guestendpt.Y - edge.startendpt[1].Y;
+                                    double Dz = guestendpt.Z - edge.startendpt[1].Z;
+                                    Vector.MemorySafe_CartVect D = new MemorySafe_CartVect(Dx, Dy, Dz);
+                                    
+                                    //use dot product to determine what is inside what
+                                    double dotgueststart = DotProductMag(A, B);
+                                    if (dotgueststart > 0 && dotgueststart - 1 < vectortol)
                                     {
-                                        //then pointed in the same direction
-
-                                        double ratio = Amag / guestvecmag;
-                                        if (ratio > 1)
-                                        {
-                                            //then this point is outside of evmag
-                                        }
-                                        else
-                                        {
-                                            //there is an intersection at the point of the test edge
-                                            test1inside = true;
-                                        }
+                                        //the start point is not inside of the guest edge
                                     }
-                                    //tolerance?
-                                    if (Vector.DotProductMag(guestPV.v, test1.v) - 1 <= vectortol)
+                                    else if (dotgueststart < 0  && Math.Abs(dotgueststart) - 1 < vectortol)
                                     {
-                                        //then this second test edge point is in a straight line in the same direction as the vector formed by the test edge
-                                        double ratio = Bmag / guestvecmag;
-                                        if (ratio > 1)
-                                        {
-                                            //then this point is outside
-                                        }
-                                        else
-                                        {
-                                            //this is also inside
-                                            test2inside = true;
-                                        }
-
-                                    }
-
-                                    if (test1inside == true && test2inside == false)
-                                    {
-                                        //make a temporary edge from just point 1 in the test edge
-                                        //this should never happen for a single space, should it?
-
-                                    }
-                                    else if (test1inside == false && test2inside == true)
-                                    {
-                                        //make a temporary edge from just point 2 in the test edge
-                                        //this should never happen for a single space, should it?
-                                    }
-                                    else if (test1inside == true && test2inside == true)
-                                    {
-                                        //the entire test edge is contained within
-                                        //this means the test edge is longer than the guest edge, but they overlap
+                                        //it is inside, and this should be sufficient enough of a test
+                                        //to prove they overlap
                                         kp.Value.relatedEdges.Add(edge);
                                         //the edge is still unique but accumulates a neighbor
                                         edge.relatedEdges.Add(kp.Value);
                                         edgeloopcounter++;
                                         continue;
                                     }
-                                    else
-                                    {
-                                        //do nothing because neither points reside inside.
-                                    }
 
+                                    double dotguestend = DotProductMag(C, D);
+                                    if (dotguestend - 1 < vectortol)
+                                    {
+                                        //the end point is not inside of the guestedge
+                                    }
+                                    else if (Math.Abs(dotguestend) - 1 < vectortol)
+                                    {
+                                        //it is inside, and this should be sufficient enough of a test
+                                        //to prove they overlap
+                                        kp.Value.relatedEdges.Add(edge);
+                                        //the edge is still unique but accumulates a neighbor
+                                        edge.relatedEdges.Add(kp.Value);
+                                        edgeloopcounter++;
+                                        continue;
+                                    }
                                 }
                             }
                         }
