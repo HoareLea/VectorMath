@@ -1157,6 +1157,42 @@ namespace VectorMath
             return centroid;
         }
 
+        //April 14,2014
+        //Added to Accommodate named surfaces.
+        public static Vector.MemorySafe_CartCoord FindVolumetricCentroid(Dictionary<string,List<Vector.MemorySafe_CartCoord>> encdef)
+        {
+            //initialize centroid coordinates
+            double x = 0;
+            double y = 0;
+            double z = 0;
+            try
+            {
+                //we first do just a very simple implementation where we find the volume's centroid as the average of all coordinates
+
+                int coordcount = 0;
+                foreach (KeyValuePair<string,List<Vector.MemorySafe_CartCoord>> surface in encdef)
+                {
+
+                    foreach (MemorySafe_CartCoord c in surface.Value)
+                    {
+                        x += c.X;
+                        y += c.Y;
+                        z += c.Z;
+                        coordcount++;
+                    }
+                }
+                x = x / coordcount;
+                y /= coordcount;
+                z = z / coordcount;
+            }
+            catch (Exception e)
+            {
+
+            }
+            MemorySafe_CartCoord centroid = new MemorySafe_CartCoord(x, y, z);
+            return centroid;
+        }
+
         public static Dictionary<string, bool> SurfacesCCWound(MemorySafe_CartCoord centroid, List<List<MemorySafe_CartCoord>> encdef, string id)
         {
             Dictionary<string, bool> results = new Dictionary<string, bool>();
@@ -1169,6 +1205,47 @@ namespace VectorMath
                     string surfid = id + "-" + surfcount.ToString();
                     MemorySafe_CartVect RHRVector = GetMemRHR(surface);
                     MemorySafe_CartCoord scent = GetCentroid(surface, true);
+                    //make vector from centroid to surface centroid
+                    MemorySafe_CartVect cent2cent = UnitVector(new MemorySafe_CartVect(scent.X - centroid.X, scent.Y - centroid.Y, scent.Z - centroid.Z));
+
+                    //take dot product
+                    double dot = DotProduct(RHRVector, cent2cent);
+                    //dot product should always indicate an angle < 90 between the RHR and the vector cent2cent
+                    if (dot < 0)
+                    {
+                        //then there is something wrong
+                        log.Error("A normal is facing in the wrong direction");
+                        results.Add(surfid, false);
+                    }
+                    else
+                    {
+                        results.Add(surfid, true);
+                    }
+                    surfcount++;
+                }
+            }
+            catch (Exception e)
+            {
+
+            }
+            return results;
+        }
+
+        //April 14, 2014
+        //Chien Harriman Carmel Software Corporation
+        //added this to accommodate surfaces that are already uniquely named.  e.g. - Surface or Space Boundaries
+        public static Dictionary<string, bool> NamedSurfacesCCWound(MemorySafe_CartCoord centroid, Dictionary<string,List<MemorySafe_CartCoord>> encdef)
+        {
+            Dictionary<string, bool> results = new Dictionary<string, bool>();
+            try
+            {
+                //is each surface normal vector pointing away from the centroid?
+                int surfcount = 1;
+                foreach (KeyValuePair<string,List<MemorySafe_CartCoord>> space in encdef)
+                {
+                    string surfid = space.Key;
+                    MemorySafe_CartVect RHRVector = GetMemRHR(space.Value);
+                    MemorySafe_CartCoord scent = GetCentroid(space.Value, true);
                     //make vector from centroid to surface centroid
                     MemorySafe_CartVect cent2cent = UnitVector(new MemorySafe_CartVect(scent.X - centroid.X, scent.Y - centroid.Y, scent.Z - centroid.Z));
 
