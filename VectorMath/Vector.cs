@@ -327,9 +327,9 @@ namespace VectorMath
             }
             catch (Exception e)
             {
-                log.Debug("DotProduct Failed." + e.ToString());
-                throw e;
+                
             }
+            return 0;
         }
 
         public static double GetAngle(MemorySafe_CartVect v1, MemorySafe_CartVect v2)
@@ -2567,7 +2567,7 @@ namespace VectorMath
                                 double dot = Vector.DotProductMag(A, ev);
                                 double crossmag = Vector.VectorMagnitude(cross);
                                 //If Vector A and ev are parallel, then the cross product magnitude should be zero, add a small tolerance?
-                                if (dot > 0 && dot - 1 < vectortol)
+                                if (dot > 0 && Math.Abs(dot) - 1 < vectortol)
                                 {
                                     //then we are at least parallel but they are perfect matches
                                     //now see if both points of the test edge resides ON the  guest edge or OUTSIDE of it
