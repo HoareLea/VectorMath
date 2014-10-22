@@ -298,6 +298,176 @@ namespace ModelingUtilities
             }
         }
 
+        public class MemorySafe_ADOpeningDefinitions
+        {
+            private readonly string _nameId;
+            private readonly string _openingType;
+            private readonly string _parentSurfaceNameId;
+            private readonly double _parentAzimuth;
+            private readonly double _parentTilt;
+            private readonly string _outsideBoundaryConditionObj;
+            private readonly double _viewFactortoGround;
+            private readonly string _shadeControlSch;
+            private readonly List<Vector.MemorySafe_CartCoord> _coordinateList;
+            private readonly double _Azimuth;
+            private readonly double _Tilt;
+            private readonly Vector.MemorySafe_CartVect _rHRVector;
+            private readonly string _constructionName;
+
+            private readonly string _frameAndDividerName;
+            private readonly int _multiplier;
+            private readonly int _numVertices;
+            private readonly double _area;
+            private readonly double _x;
+            private readonly double _z;
+            private readonly double _height;
+            private readonly double _length;
+            
+
+            public MemorySafe_ADOpeningDefinitions(string nameId, string openType, string parentSurf, double parentAz, double parentTilt,
+                string oBCond, double vF, string shadeCntrlSch, List<Vector.MemorySafe_CartCoord> coordList, double az,
+                double tilt, Vector.MemorySafe_CartVect RHR, string constName, string frameandDivider, int mult, int numVert, double area, 
+                double x, double z, double height, double length)
+            {
+                _nameId = nameId;
+                _openingType = openType;
+                _parentSurfaceNameId = parentSurf;
+                _parentAzimuth = parentAz;
+                _parentTilt = parentTilt;
+
+                _outsideBoundaryConditionObj = oBCond;
+                _viewFactortoGround = vF;
+                _shadeControlSch = shadeCntrlSch;
+                _coordinateList = coordList;
+                _Azimuth = az;
+                _Tilt = tilt;
+                Vector.MemorySafe_CartVect _rHRVector = RHR;
+                _constructionName = constName;
+
+                _frameAndDividerName = frameandDivider;
+                _multiplier = mult;
+                _numVertices = numVert;
+                _area = area;
+                _x = x;
+                _z = z;
+                _height = height;
+                _length = length;
+            }
+
+            public string nameId { get { return _nameId; } }
+            public string openingType { get { return _openingType; } }
+            public string parentSurfaceNameId { get { return _parentSurfaceNameId; } }
+            public double parentAzimuth { get { return _parentAzimuth; } }
+            public double parentTilt { get { return _parentTilt; } }
+            public string outsideBoundaryConditionObj { get { return _outsideBoundaryConditionObj; } }
+            public double viewFactortoGround { get { return _viewFactortoGround; } }
+            public string shadeControlSch { get { return _shadeControlSch; } }
+            public List<Vector.MemorySafe_CartCoord> coordinateList { get { return _coordinateList; } }
+            public double Azimuth { get { return _Azimuth; } }
+            public double Tilt { get { return _Tilt; } }
+            public Vector.MemorySafe_CartVect rHRVector { get { return _rHRVector; } }
+            public string constructionName { get { return _constructionName; } }
+
+            public string frameAndDividerName { get { return _frameAndDividerName; } }
+            public int multiplier { get { return _multiplier; } }
+            public int numVertices { get { return _numVertices; } }
+            public double area { get { return _area; } }
+            public double x { get { return _x; } }
+            public double z  { get { return _z;} }
+            public double height { get { return _height; } }
+            public double length { get { return _length; } }
+
+            //public MemorySafe_ADOpeningDefinitions(MemorySafe_OpeningDefinitions previousOpening)
+            //{
+            //    _nameId = previousOpening.nameId;
+            //    _openingType = previousOpening.openingType;
+            //    _parentSurfaceNameId = previousOpening.parentSurfaceNameId;
+            //    _parentAzimuth = previousOpening.parentAzimuth; ;
+            //    _parentTilt = previousOpening.parentTilt;
+            //    _outsideBoundaryConditionObj = previousOpening.outsideBoundaryConditionObj;
+            //    _viewFactortoGround = previousOpening.viewFactortoGround;
+            //    _shadeControlSch = previousOpening.shadeControlSch;
+            //    _coordinateList = previousOpening.coordinateList;
+            //    _Azimuth = previousOpening.Azimuth;
+            //    _Tilt = previousOpening.Tilt;
+            //    _rHRVector = previousOpening.rHRVector;
+            //    _constructionName = previousOpening.constructionName;
+
+            //    _frameAndDividerName = previousOpening.frameAndDividerName;
+            //    _multiplier = previousOpening.multiplier;
+            //    _numVertices = previousOpening.numVertices;
+            //    _area = previousOpening.area;
+            //}
+
+            //public MemorySafe_ADOpeningDefinitions(MemorySafe_OpeningDefinitions previousOpening, int multiplier)
+            //{
+            //    _nameId = previousOpening.nameId;
+            //    _openingType = previousOpening.openingType;
+            //    _parentSurfaceNameId = previousOpening.parentSurfaceNameId;
+            //    _parentAzimuth = previousOpening.parentAzimuth; ;
+            //    _parentTilt = previousOpening.parentTilt;
+            //    _outsideBoundaryConditionObj = previousOpening.outsideBoundaryConditionObj;
+            //    _viewFactortoGround = previousOpening.viewFactortoGround;
+            //    _shadeControlSch = previousOpening.shadeControlSch;
+            //    _coordinateList = previousOpening.coordinateList;
+            //    _Azimuth = previousOpening.Azimuth;
+            //    _Tilt = previousOpening.Tilt;
+            //    _rHRVector = previousOpening.rHRVector;
+            //    _constructionName = previousOpening.constructionName;
+
+            //    _frameAndDividerName = previousOpening.frameAndDividerName;
+            //    _multiplier = multiplier;
+            //    _numVertices = previousOpening.numVertices;
+            //    _area = previousOpening.area;
+            //}
+
+            //public MemorySafe_ADOpeningDefinitions(MemorySafe_OpeningDefinitions previousOpening, List<Vector.MemorySafe_CartCoord> desiredCoords)
+            //{
+            //    _nameId = previousOpening.nameId;
+            //    _openingType = previousOpening.openingType;
+            //    _parentSurfaceNameId = previousOpening.parentSurfaceNameId;
+            //    _parentAzimuth = previousOpening.parentAzimuth; ;
+            //    _parentTilt = previousOpening.parentTilt;
+            //    _outsideBoundaryConditionObj = previousOpening.outsideBoundaryConditionObj;
+            //    _viewFactortoGround = previousOpening.viewFactortoGround;
+            //    _shadeControlSch = previousOpening.shadeControlSch;
+            //    //gives a new set of coordinates as provided
+            //    _coordinateList = desiredCoords;
+            //    _Azimuth = previousOpening.Azimuth;
+            //    _Tilt = previousOpening.Tilt;
+            //    _rHRVector = previousOpening.rHRVector;
+            //    _constructionName = previousOpening.constructionName;
+
+            //    _frameAndDividerName = previousOpening.frameAndDividerName;
+            //    _multiplier = previousOpening.multiplier;
+            //    _numVertices = previousOpening.numVertices;
+            //    _area = previousOpening.area;
+            //}
+
+            //public MemorySafe_ADOpeningDefinitions(MemorySafe_OpeningDefinitions previousOpening, List<Vector.MemorySafe_CartCoord> desiredCoords, int newMultiplier)
+            //{
+            //    _nameId = previousOpening.nameId;
+            //    _openingType = previousOpening.openingType;
+            //    _parentSurfaceNameId = previousOpening.parentSurfaceNameId;
+            //    _parentAzimuth = previousOpening.parentAzimuth; ;
+            //    _parentTilt = previousOpening.parentTilt;
+            //    _outsideBoundaryConditionObj = previousOpening.outsideBoundaryConditionObj;
+            //    _viewFactortoGround = previousOpening.viewFactortoGround;
+            //    _shadeControlSch = previousOpening.shadeControlSch;
+            //    //gives a new set of coordinates as provided
+            //    _coordinateList = desiredCoords;
+            //    _Azimuth = previousOpening.Azimuth;
+            //    _Tilt = previousOpening.Tilt;
+            //    _rHRVector = previousOpening.rHRVector;
+            //    _constructionName = previousOpening.constructionName;
+
+            //    _frameAndDividerName = previousOpening.frameAndDividerName;
+            //    _multiplier = newMultiplier;
+            //    _numVertices = previousOpening.numVertices;
+            //    _area = previousOpening.area;
+            //}
+        }
+
         public static MemorySafe_Surface convert2MemorySafeSurface(Surface surface)
         {
             List<Vector.MemorySafe_CartCoord> surfaceCoords = new List<Vector.MemorySafe_CartCoord>();
@@ -331,6 +501,35 @@ namespace ModelingUtilities
                 opening.shadeControlSch, surfaceCoords, opening.Azimuth, opening.Tilt, memSafeRHR,
                 opening.constructionName, opening.frameAndDividerName, opening.multiplier, opening.numVertices,
                 opening.area);
+
+            return memOpening;
+
+        }
+
+        public static MemorySafe_ADOpeningDefinitions convert2ADMemorySafeOpening(OpeningDefinitions opening)
+        {
+            List<Vector.MemorySafe_CartCoord> surfaceCoords = new List<Vector.MemorySafe_CartCoord>();
+
+            Vector.CartVect dummy = new Vector.CartVect();
+            dummy.X = -999;
+            dummy.Y = -999;
+            dummy.Z = -999;
+            Vector.MemorySafe_CartVect memSafeRHR = Vector.convertToMemorySafeVector(dummy);
+            string openingType = "N/A";
+            double parentAzimuth = 0;
+            double parentTilt = 0;
+            string outsideBoundary = "Outdoors";
+            double viewFactor = 0;
+            double az = -999;
+            double tilt = -999;
+            int numvertices = 4;
+            double area = opening.height * opening.length;
+            MemorySafe_ADOpeningDefinitions memOpening = new MemorySafe_ADOpeningDefinitions(opening.nameId,
+                openingType, opening.parentSurfaceNameId,
+                parentAzimuth, parentTilt, outsideBoundary, viewFactor,
+                opening.shadeControlSch, surfaceCoords, az, tilt, memSafeRHR,
+                opening.constructionName, opening.frameAndDividerName, opening.multiplier, numvertices,
+                opening.area, opening.X, opening.Z, opening.height, opening.length);
 
             return memOpening;
 
@@ -494,6 +693,10 @@ namespace ModelingUtilities
             public int multiplier;
             public int numVertices;
             public double area;
+            public double X;
+            public double Z;
+            public double length;
+            public double height;
         }
     }
 
