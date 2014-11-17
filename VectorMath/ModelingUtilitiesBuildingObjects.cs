@@ -29,9 +29,11 @@ namespace ModelingUtilities
 
         public class Spaces
         {
-            public string name;
-            public int multiplier;
-            public List<Surface> spaceSurfaces;
+            public string name { get; set; }
+            public double area { get; set; }
+            public int multiplier { get; set; }
+            public List<Surface> spaceSurfaces { get; set; }
+
 
         }
 
